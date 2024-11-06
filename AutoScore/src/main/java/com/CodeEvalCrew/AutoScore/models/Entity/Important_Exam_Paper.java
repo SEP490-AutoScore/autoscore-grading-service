@@ -1,6 +1,7 @@
 package com.CodeEvalCrew.AutoScore.models.Entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -22,10 +23,10 @@ public class Important_Exam_Paper {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long importantExamPaperId;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "importantId", nullable = false)
     private Important important;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "examPaperId", nullable = false)
     private Exam_Paper examPaper;
 }

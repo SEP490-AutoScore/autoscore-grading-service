@@ -22,10 +22,54 @@ import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
+import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
+import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
+import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
+import com.CodeEvalCrew.AutoScore.models.Entity.Important;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SourceCheckUtil {
+    private static final String SECTION_STRING = "ConnectionStrings";
+    private static final String NODE_DATABASE_STRING = "MyDB";
+    private static final String APPSETTING_NAME = "appsettings.json";
+    private static final int REQUIRE_PROJ = 2;
+
+    public List<StudentSourceInfoDTO> getImportantToCheck(List<Important> importants, List<StudentSource> students, Exam_Paper examPaper) throws Exception, NotFoundException {
+        List<StudentSourceInfoDTO> result = new ArrayList<>();
+        for (StudentSource student : students) {
+            boolean isPass = true;
+            for (Important important : importants) {
+                switch (important.getImportantCode()) {
+                    case "SLN" -> {
+                        String solutionName = examPaper.getExam().getExamCode() + "_" + examPaper.getExamPaperCode() + "_" + student.getStudent().getStudentCode();
+                        Optional<String> SLNFlag = checkSolutionName(solutionName, student.getSourceDetail().getStudentSourceCodePath());
+                        if (SLNFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    case "CNS" -> {
+                        Optional<String> CNTFlag = checkConnectionStrings(student.getSourceDetail().getStudentSourceCodePath(), SECTION_STRING, NODE_DATABASE_STRING, APPSETTING_NAME);
+                        if (CNTFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    case "SST" -> {
+                        Optional<String> SSTFlag = checkSourceStructure(student.getSourceDetail().getStudentSourceCodePath(), REQUIRE_PROJ);
+                        if (SSTFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    default ->
+                        throw new AssertionError();
+                }
+            }
+            if (isPass) {
+                result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+            }
+        }
+        return result;
+    }
 
     public Optional<String> checkImportant(String sourcePath, String studentCode, String examPaperCode, String examCode) throws Exception {
         try {
@@ -36,9 +80,6 @@ public class SourceCheckUtil {
             checkConnectionStrings(sourcePath, "ConnectionStrings", "MyDB", "appsettings.json");
             //chheck source structure
             checkSourceStructure(sourcePath, 2);
-
-            //check db conenct on api layer
-            checkAPILayer();
 
         } catch (NotFoundException e) {
             return Optional.empty();
@@ -54,20 +95,20 @@ public class SourceCheckUtil {
         if (jsonPath.isEmpty()) {
             throw new NotFoundException(fileName + " not found");
         }
-        // analyzeAppSettings(jsonPath.toString(), "ConnectionStrings", "MyDB");
-        analyzeAppSettings(jsonPath.toString(), section, dbNode);
-        return Optional.empty();
+        boolean flag = analyzeAppSettings(jsonPath.toString(), section, dbNode);
+        if (flag) {
+            return Optional.of("PASS");  
+        }
+        return null;
     }
 
     private Optional<String> checkSolutionName(String solutionName, String sourcePath) throws NotFoundException {
         try {
             Optional<String> solution = findSolutionName(sourcePath, solutionName);
             if (solution.isEmpty()) {
-                throw new NotFoundException("Solution not found");
+                return null;
             }
             return solution;
-        } catch (NotFoundException e) {
-            throw e;
         } catch (Exception e) {
             System.out.println(e.getCause());
             throw e;
@@ -78,20 +119,20 @@ public class SourceCheckUtil {
         List<File> csprojFiles = collectCsprojFiles(new File(projectRoot));
         if (csprojFiles.isEmpty()) {
             System.out.println("No .csproj files found.");
-            return Optional.empty();
+            return null;
         }
-        if(csprojFiles.size() < requireProj){
-            return Optional.empty(); 
+        if (csprojFiles.size() < requireProj) {
+            System.out.println(".csproj files found does not meet the requirements.");
+            return null;
         }
         File mainProject = findMainProject(csprojFiles);
 
         boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
         System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
-        return Optional.empty();
-    }
-
-    private Optional<String> checkAPILayer() {
-        return Optional.empty();
+        if (allReferenced) {
+            return Optional.of("PASS");
+        }
+        return null;
     }
 
     public static void analyzeCSharpStructure(String directoryPath) throws IOException {
@@ -167,8 +208,9 @@ public class SourceCheckUtil {
     }
 
     //read appsetting
-    public static void analyzeAppSettings(String filePath, String sectionName, String dbNode) {
+    public static boolean analyzeAppSettings(String filePath, String sectionName, String dbNode) {
         ObjectMapper mapper = new ObjectMapper();
+        boolean result = false;
         try {
             // Parse the JSON file
             JsonNode rootNode = mapper.readTree(new File(filePath));
@@ -182,6 +224,7 @@ public class SourceCheckUtil {
                 if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
                     System.out.println(dbNode + " found in " + sectionName + ".");
                     displaySection(sectionNode, sectionName);
+                    result = true;
                 } else if (sectionName.equals(sectionName)) {
                     System.out.println("No " + dbNode + " found in " + sectionName + ".");
                 }
@@ -196,11 +239,12 @@ public class SourceCheckUtil {
             while (rootKeys.hasNext()) {
                 System.out.println(" - " + rootKeys.next());
             }
-
+            
         } catch (IOException e) {
             System.err.println("Error reading or parsing file: " + filePath);
             e.printStackTrace();
         }
+        return result;
     }
 
     // Display nested JSON sections
