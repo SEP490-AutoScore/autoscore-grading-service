@@ -3,6 +3,8 @@ package com.CodeEvalCrew.AutoScore.models.Entity;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Type_Enum;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -33,6 +35,7 @@ public class Exam {
     private LocalDateTime gradingAt;
     private LocalDateTime publishAt;
     private boolean status;
+    private Exam_Type_Enum type;
     private LocalDateTime createdAt;
     private Long createdBy;
     private LocalDateTime updatedAt;

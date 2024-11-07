@@ -19,14 +19,57 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
+import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
+import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
+import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
+import com.CodeEvalCrew.AutoScore.models.Entity.Important;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SourceCheckUtil {
+    private static final String SECTION_STRING = "ConnectionStrings";
+    private static final String NODE_DATABASE_STRING = "MyDB";
+    private static final String APPSETTING_NAME = "appsettings.json";
+    private static final int REQUIRE_PROJ = 2;
+
+    public List<StudentSourceInfoDTO> getImportantToCheck(List<Important> importants, List<StudentSource> students, Exam_Paper examPaper) throws Exception, NotFoundException {
+        List<StudentSourceInfoDTO> result = new ArrayList<>();
+        for (StudentSource student : students) {
+            boolean isPass = true;
+            for (Important important : importants) {
+                switch (important.getImportantCode()) {
+                    case "SLN" -> {
+                        String solutionName = examPaper.getExam().getExamCode() + "_" + examPaper.getExamPaperCode() + "_" + student.getStudent().getStudentCode();
+                        Optional<String> SLNFlag = checkSolutionName(solutionName, student.getSourceDetail().getStudentSourceCodePath());
+                        if (SLNFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    case "CNS" -> {
+                        Optional<String> CNTFlag = checkConnectionStrings(student.getSourceDetail().getStudentSourceCodePath(), SECTION_STRING, NODE_DATABASE_STRING, APPSETTING_NAME);
+                        if (CNTFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    case "SST" -> {
+                        Optional<String> SSTFlag = checkSourceStructure(student.getSourceDetail().getStudentSourceCodePath(), REQUIRE_PROJ);
+                        if (SSTFlag == null) {
+                            isPass = false;
+                        }
+                    }
+                    default ->
+                        throw new AssertionError();
+                }
+            }
+            if (isPass) {
+                result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+            }
+        }
+        return result;
+    }
 
     public Optional<String> checkImportant(String sourcePath, String studentCode, String examPaperCode, String examCode) throws Exception {
         try {
@@ -36,10 +79,7 @@ public class SourceCheckUtil {
             //check connection string
             checkConnectionStrings(sourcePath, "ConnectionStrings", "MyDB", "appsettings.json");
             //chheck source structure
-            checkSourceStructure();
-
-            //check db conenct on api layer
-            checkAPILayer();
+            checkSourceStructure(sourcePath, 2);
 
         } catch (NotFoundException e) {
             return Optional.empty();
@@ -55,59 +95,44 @@ public class SourceCheckUtil {
         if (jsonPath.isEmpty()) {
             throw new NotFoundException(fileName + " not found");
         }
-        // analyzeAppSettings(jsonPath.toString(), "ConnectionStrings", "MyDB");
-        analyzeAppSettings(jsonPath.toString(), section, dbNode);
-        return Optional.empty();
+        boolean flag = analyzeAppSettings(jsonPath.toString(), section, dbNode);
+        if (flag) {
+            return Optional.of("PASS");  
+        }
+        return null;
     }
 
     private Optional<String> checkSolutionName(String solutionName, String sourcePath) throws NotFoundException {
         try {
             Optional<String> solution = findSolutionName(sourcePath, solutionName);
             if (solution.isEmpty()) {
-                throw new NotFoundException("Solution not found");
+                return null;
             }
             return solution;
-        } catch (NotFoundException e) {
-            throw e;
         } catch (Exception e) {
             System.out.println(e.getCause());
             throw e;
         }
     }
 
-    private Optional<String> checkSourceStructure() {
-        String projectRoot = "path/to/your/project/directory"; // Set the root directory of your project
-
-        // Step 1: Identify the "main" .csproj file
-        String mainCsproj = findMainCsproj(projectRoot);
-        if (mainCsproj == null) {
-            System.out.println("Main .csproj file not found.");
-            return Optional.empty();
+    private static Optional<String> checkSourceStructure(String projectRoot, int requireProj) throws Exception {
+        List<File> csprojFiles = collectCsprojFiles(new File(projectRoot));
+        if (csprojFiles.isEmpty()) {
+            System.out.println("No .csproj files found.");
+            return null;
         }
-
-        System.out.println("Main .csproj file: " + new File(mainCsproj).getName());
-
-        // Step 2: Find all .csproj files in the project
-        List<String> allCsprojFiles = new ArrayList<>();
-        findAllCsprojFiles(new File(projectRoot), allCsprojFiles);
-
-        // Step 3: Check if each .csproj has references
-        for (String csprojFile : allCsprojFiles) {
-            if (csprojFile.equals(mainCsproj)) {
-                continue;
-            }
-
-            if (hasReferences(csprojFile)) {
-                System.out.println(new File(csprojFile).getName() + " has references.");
-            } else {
-                System.out.println(new File(csprojFile).getName() + " does NOT have references.");
-            }
+        if (csprojFiles.size() < requireProj) {
+            System.out.println(".csproj files found does not meet the requirements.");
+            return null;
         }
-        return Optional.empty();
-    }
+        File mainProject = findMainProject(csprojFiles);
 
-    private Optional<String> checkAPILayer() {
-        return Optional.empty();
+        boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
+        System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
+        if (allReferenced) {
+            return Optional.of("PASS");
+        }
+        return null;
     }
 
     public static void analyzeCSharpStructure(String directoryPath) throws IOException {
@@ -183,8 +208,9 @@ public class SourceCheckUtil {
     }
 
     //read appsetting
-    public static void analyzeAppSettings(String filePath, String sectionName, String dbNode) {
+    public static boolean analyzeAppSettings(String filePath, String sectionName, String dbNode) {
         ObjectMapper mapper = new ObjectMapper();
+        boolean result = false;
         try {
             // Parse the JSON file
             JsonNode rootNode = mapper.readTree(new File(filePath));
@@ -198,6 +224,7 @@ public class SourceCheckUtil {
                 if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
                     System.out.println(dbNode + " found in " + sectionName + ".");
                     displaySection(sectionNode, sectionName);
+                    result = true;
                 } else if (sectionName.equals(sectionName)) {
                     System.out.println("No " + dbNode + " found in " + sectionName + ".");
                 }
@@ -212,11 +239,12 @@ public class SourceCheckUtil {
             while (rootKeys.hasNext()) {
                 System.out.println(" - " + rootKeys.next());
             }
-
+            
         } catch (IOException e) {
             System.err.println("Error reading or parsing file: " + filePath);
             e.printStackTrace();
         }
+        return result;
     }
 
     // Display nested JSON sections
@@ -279,19 +307,6 @@ public class SourceCheckUtil {
         }
     }
 
-    // Method to get all .csproj files and their references
-    public static Map<String, List<String>> getCsprojFilesAndReferences(String projectPath) {
-        Map<String, List<String>> projectReferences = new HashMap<>();
-        List<File> csprojFiles = collectCsprojFiles(new File(projectPath));
-        System.out.println(csprojFiles.size());
-        for (File csprojFile : csprojFiles) {
-            List<String> references = getProjectReferences(csprojFile);
-            projectReferences.put(csprojFile.getName(), references);
-        }
-
-        return projectReferences;
-    }
-
     // Helper function to recursively collect all .csproj files
     private static List<File> collectCsprojFiles(File dir) {
         List<File> csprojFiles = new ArrayList<>();
@@ -305,133 +320,87 @@ public class SourceCheckUtil {
         return csprojFiles;
     }
 
-    // Function to parse a .csproj file and extract its project references
-    private static List<String> getProjectReferences(File csprojFile) {
+    //main check
+    public static void main(String[] args) throws IOException {
+        String projectPath = "C:\\Project\\PE_PRN231_SU24_009909\\StudentSolution\\1\\vuongvtse160599\\0\\PEPRN231_SU24_009909_VoTrongVuong_BE";  // Replace with the path to your project directory
+        List<File> csprojFiles = collectCsprojFiles(new File(projectPath));
+        if (csprojFiles.isEmpty()) {
+            System.out.println("No .csproj files found.");
+        } else {
+            System.out.println(csprojFiles.size() + " .csproj files found:");
+            // csprojFiles.forEach(file -> System.out.println(file.getAbsolutePath()));
+        }
+        File mainProject = findMainProject(csprojFiles);
+
+        boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
+        System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
+    }
+
+    static boolean checkAllProjectsReferenced(List<File> csprojFiles, File mainProject) {
+        Map<String, List<String>> projectReferences = new HashMap<>();
+
+        // Get project names and their references
+        for (File csprojFile : csprojFiles) {
+            String projectName = csprojFile.getName().replace(".csproj", "");
+            List<String> references = getProjectReferences(csprojFile);
+            projectReferences.put(projectName, references);
+        }
+
+        // Check if each project (excluding the main project) is referenced by at least one other project
+        for (String project : projectReferences.keySet()) {
+            if (mainProject.getName().replace(".csproj", "").equals(project)) {
+                continue; // Skip the main project
+            }
+
+            boolean isReferenced = false;
+
+            for (Map.Entry<String, List<String>> entry : projectReferences.entrySet()) {
+                String otherProject = entry.getKey();
+                List<String> references = entry.getValue();
+
+                // Check if the current project is listed in the references of any other project
+                if (!otherProject.equals(project) && references.contains(project)) {
+                    isReferenced = true;
+                    break;
+                }
+            }
+
+            if (!isReferenced) {
+                return false; // If any project is not referenced by another project
+            }
+        }
+
+        return true; // All non-main projects are referenced by at least one other project
+    }
+
+    static File findMainProject(List<File> csprojFiles) {
+        for (File csprojFile : csprojFiles) {
+            File projectDir = csprojFile.getParentFile();
+            File programFile = new File(projectDir, "Program.cs");
+
+            // Check if Program.cs exists in the project directory
+            if (programFile.exists()) {
+                return csprojFile; // Return the project file if Program.cs is found
+            }
+        }
+        return null; // No main project found
+    }
+
+    static List<String> getProjectReferences(File projectFile) {
         List<String> references = new ArrayList<>();
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(csprojFile);
-            doc.getDocumentElement().normalize();
-
-            NodeList projectReferences = doc.getElementsByTagName("ProjectReference");
-
-            for (int i = 0; i < projectReferences.getLength(); i++) {
-                Element reference = (Element) projectReferences.item(i);
-                String includePath = reference.getAttribute("Include");
-                references.add(includePath);
+            Document doc = builder.parse(projectFile);
+            NodeList nodeList = doc.getElementsByTagName("ProjectReference");
+            for (int i = 0; i < nodeList.getLength(); i++) {
+                String projectRef = nodeList.item(i).getAttributes().getNamedItem("Include").getNodeValue();
+                String projectName = new File(projectRef).getName().replace(".csproj", "");
+                references.add(projectName);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("Error parsing references in " + csprojFile.getName());
         }
         return references;
-    }
-
-    // Method to find the "main" .csproj (the one in the same directory as Program.cs)
-    private static String findMainCsproj(String rootDir) {
-        File root = new File(rootDir);
-        File[] programFiles = root.listFiles((dir, name) -> name.equals("Program.cs"));
-
-        List<String> mainCsprojFiles = new ArrayList<>();
-
-        if (programFiles != null) {
-            for (File programFile : programFiles) {
-                String parentDir = programFile.getParent();
-                File csprojFile = new File(parentDir, programFile.getName().replace(".cs", ".csproj"));
-                if (csprojFile.exists()) {
-                    mainCsprojFiles.add(csprojFile.getAbsolutePath());
-                }
-            }
-        }
-
-        // Log all found main csproj files
-        if (!mainCsprojFiles.isEmpty()) {
-            System.out.println("Found main .csproj files:");
-            for (String csproj : mainCsprojFiles) {
-                System.out.println(" - " + new File(csproj).getName());
-            }
-            return mainCsprojFiles.get(0); // Return the first found one
-        }
-
-        return null;
-    }
-
-    // Method to find all .csproj files in the project
-    private static void findAllCsprojFiles(File dir, List<String> csprojFiles) {
-        File[] files = dir.listFiles();
-
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    findAllCsprojFiles(file, csprojFiles);
-                } else if (file.getName().endsWith(".csproj")) {
-                    csprojFiles.add(file.getAbsolutePath());
-                }
-            }
-        }
-    }
-
-    // Method to check if a .csproj file has any project references
-    private static boolean hasReferences(String csprojPath) {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new File(csprojPath));
-
-            NodeList projectReferences = doc.getElementsByTagName("ProjectReference");
-            return projectReferences.getLength() > 0;
-
-        } catch (Exception e) {
-            System.out.println("Error reading " + csprojPath + ": " + e.getMessage());
-            return false;
-        }
-    }
-
-    //main check
-    public static void main(String[] args) throws IOException {
-        String projectPath = "C:\\Project\\PE_PRN231_SU24_009909\\StudentSolution\\1\\vuongvtse160599\\0\\PEPRN231_SU24_009909_VoTrongVuong_BE";  // Replace with the path to your project directory
-
-        // Optional<String> appSettingsPath = findAppsettingsJsonPath(projectPath);
-        // //json file
-        // appSettingsPath.ifPresentOrElse(
-        //         path -> System.out.println("Path to appsettings.json: " + path),
-        //         () -> System.out.println("appsettings.json file not found.")
-        // );
-        // String solutionNamePart = "PEPRN231_SU24_009909_VoTrongVuong_BE";   //?? Replace with part of the solution name you're looking for ??
-        // Optional<String> solutionName = findSolutionName(projectPath, solutionNamePart);
-        // String path = appSettingsPath.orElseThrow(() -> new RuntimeException("Path not found"));
-        // analyzeAppSettings(path, "ConnectionStrings", "MyDB");
-        // solutionName.ifPresentOrElse(
-        //         name -> System.out.println("Solution found: " + name),
-        //         () -> System.out.println("No matching solution (.sln) file found.")
-        // );
-        // Optional<String> test = findSolutionName(projectPath, solutionNamePart);
-        // System.out.println(test.toString());
-        // analyzeCSharpStructure(projectPath);
-        // List<String> folderNames = getAllFolderNamesInSolutionDirectory(projectPath);
-        // if (folderNames.isEmpty()) {
-        //     System.out.println("No folders found in the directory containing the .sln file.");
-        // } else {
-        //     System.out.println("Folders found in the solution directory:");
-        //     for (String folderName : folderNames) {
-        //         System.out.println(folderName);
-        //     }
-        // }
-        Map<String, List<String>> projectReferences = getCsprojFilesAndReferences(projectPath);
-
-        // Output each .csproj file and its references
-        for (Map.Entry<String, List<String>> entry : projectReferences.entrySet()) {
-            System.out.println("Project: " + entry.getKey());
-            if (entry.getValue().isEmpty()) {
-                System.out.println("   No references found.");
-            } else {
-                System.out.println("   References:");
-                for (String reference : entry.getValue()) {
-                    System.out.println("     - " + reference);
-                }
-            }
-        }
-
     }
 }

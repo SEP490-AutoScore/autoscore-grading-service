@@ -247,3 +247,18 @@ VALUES
 -- );
 
 
+SELECT * FROM autoscore.important;INSERT INTO `autoscore`.`important`
+(`subject_id`,
+`important_code`,
+`important_name`)
+VALUES
+(1,
+'CNS',
+'Check connection String of the appsetting'),
+(1,
+'SLN',
+'Check solution name'),
+(1,
+'SST',
+'Check source structure');
+
