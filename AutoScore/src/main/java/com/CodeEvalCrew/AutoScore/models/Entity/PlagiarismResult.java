@@ -1,13 +1,11 @@
 package com.CodeEvalCrew.AutoScore.models.Entity;
 
+import java.util.Map;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,18 +14,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Student_Error {
+public class PlagiarismResult {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long studentErrorId;
-    @Lob
-    private String errorContent;
-
-    @ManyToOne
-    @JoinColumn(name = "sourceId", nullable = false)
-    private Source source;
-
-    @OneToOne
-    @JoinColumn(name = "studentId", nullable = true)
+    private Long plagiarismResultId;
+    private String checkType;
     private Student student;
+    private Student dbStudent;
+    private boolean isPlagiarized;
+    private double similarity;
+    private Map<String, Integer> tokenFrequency;
 }
