@@ -12,4 +12,6 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 public interface ScoreRepository extends JpaRepository<Score, Long> {
     @Query("SELECT s FROM Student s WHERE s.studentId = :studentId")
     Student findStudentById(@Param("studentId") Long studentId);
+
+    Score findByStudentStudentId(Long studentId);
 }
