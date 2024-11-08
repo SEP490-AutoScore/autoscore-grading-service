@@ -23,7 +23,7 @@ public class PlagiarismCheckController {
     public void runPlagiarismDetection(@RequestBody List<StudentSourceInfoDTO> sourceDetails, 
     @RequestParam("exam_type") String examType, @RequestParam("organization_id") Long organizationId) {
         try {
-            plagiarismDetectionService.runPlagiarismDetection(sourceDetails);
+            plagiarismDetectionService.runPlagiarismDetection(sourceDetails, examType, organizationId);
         }
         catch (Exception e) {
             e.printStackTrace();

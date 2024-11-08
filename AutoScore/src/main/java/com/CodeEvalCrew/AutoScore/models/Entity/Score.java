@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,7 @@ public class Score {
     private LocalDateTime gradedAt;
 
     private Boolean flag; // 0 = không bị đánh cờ, 1 = kiểm tra đặc biệt
+    @Lob
     private String flagReason;
 
     //Relationship
@@ -55,7 +57,4 @@ public class Score {
     @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Score_Detail> scoreDetails;
 
-    // @OneToOne
-    // @JoinColumn(name = "plagiarismResultId", nullable = true)
-    // private PlagiarismResult plagiarismResult;
 }
