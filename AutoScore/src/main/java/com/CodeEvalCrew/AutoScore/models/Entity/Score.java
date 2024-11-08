@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -56,7 +55,7 @@ public class Score {
     @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Score_Detail> scoreDetails;
 
-    @OneToOne
-    @JoinColumn(name = "plagiarismResultId", nullable = true)
-    private PlagiarismResult plagiarismResult;
+    // @OneToOne
+    // @JoinColumn(name = "plagiarismResultId", nullable = true)
+    // private PlagiarismResult plagiarismResult;
 }

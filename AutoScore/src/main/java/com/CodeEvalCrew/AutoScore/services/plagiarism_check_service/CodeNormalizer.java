@@ -16,7 +16,6 @@ public class CodeNormalizer {
     @SuppressWarnings("CallToPrintStackTrace")
     String normalizeCode(String folderPath) {
         StringBuilder combinedCode = new StringBuilder();
-
         try {
             // Duyệt qua tất cả các tệp .cs trong thư mục (bao gồm cả thư mục con)
             Stream<Path> filePaths = Files.walk(Paths.get(folderPath))
@@ -41,9 +40,11 @@ public class CodeNormalizer {
 
             String code = combinedCode.toString();
 
-            // Loại bỏ tất cả các dòng `using` và khai báo `namespace`
+            // Loại bỏ các dòng `using`, `namespace`, và các dòng chú thích
             code = code.replaceAll("(?m)^\\s*using\\s.*;", ""); // Loại bỏ các dòng using
             code = code.replaceAll("(?m)^\\s*namespace\\s.*\\{", ""); // Loại bỏ các dòng namespace
+            code = code.replaceAll("//.*", ""); // Loại bỏ chú thích đơn dòng
+            code = code.replaceAll("/\\*.*?\\*/", ""); // Loại bỏ chú thích đa dòng
 
             // Loại bỏ phần khai báo lớp bên ngoài
             code = code.replaceAll("(?s)(public|private|protected)?\\s*class\\s+[^{]+\\{", "");

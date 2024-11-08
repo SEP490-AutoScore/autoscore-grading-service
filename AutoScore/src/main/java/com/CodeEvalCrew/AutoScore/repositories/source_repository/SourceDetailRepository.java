@@ -12,5 +12,5 @@ public interface SourceDetailRepository extends JpaRepository<Source_Detail, Lon
     List<Source_Detail> findBySource_ExamPaper_ExamPaperIdOrderByStudent_StudentId(Long examPaperId);
     // Spring Data JPA will derive the query based on method name
     Source_Detail  findByStudentStudentIdAndSourceExamPaperExamPaperId(Long studentId, Long examPaperId);
-    List<Source_Detail> findByStudentSourceCodePathContaining(String campus);
+    List<Source_Detail> findAllByTypeAndStudentOrganizationOrganizationId(String examType, Long organizationId);
 }

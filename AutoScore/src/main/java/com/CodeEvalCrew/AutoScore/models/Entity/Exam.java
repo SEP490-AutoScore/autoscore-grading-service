@@ -7,6 +7,8 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Type_Enum;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,6 +37,7 @@ public class Exam {
     private LocalDateTime gradingAt;
     private LocalDateTime publishAt;
     private boolean status;
+    @Enumerated(EnumType.STRING)
     private Exam_Type_Enum type;
     private LocalDateTime createdAt;
     private Long createdBy;
