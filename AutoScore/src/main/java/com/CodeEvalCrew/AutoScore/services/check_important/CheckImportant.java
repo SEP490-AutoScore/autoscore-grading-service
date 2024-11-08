@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.stereotype.Service;
 
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
@@ -26,6 +27,7 @@ import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRep
 import com.CodeEvalCrew.AutoScore.repositories.student_repository.StudentRepository;
 import com.CodeEvalCrew.AutoScore.utils.SourceCheckUtil;
 
+@Service
 public class CheckImportant implements ICheckImportant{
     @Autowired
     private final SourceCheckUtil utils;
