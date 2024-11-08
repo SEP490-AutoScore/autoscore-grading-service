@@ -33,7 +33,8 @@ public class Score {
 
     private LocalDateTime gradedAt;
 
-    private Boolean flag;
+    private Boolean flag; // 0 = không bị đánh cờ, 1 = kiểm tra đặc biệt
+    private String flagReason;
 
     //Relationship
     //n-1 exam paper
@@ -53,4 +54,8 @@ public class Score {
     //1-n score detail
     @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Score_Detail> scoreDetails;
+
+    // @OneToOne
+    // @JoinColumn(name = "plagiarismResultId", nullable = true)
+    // private PlagiarismResult plagiarismResult;
 }
