@@ -16,26 +16,31 @@ public class ScoreManager {
     private ScoreRepository scoreRepository;
 
     // Hàm cập nhật đánh giá đạo văn và lưu trạng thái đạo văn
-    Score setScoreRecord(Source_Detail detail, boolean isSuspicious, List<String> plagiarizedSections, String otherStudentId) {
+    Score setScoreRecord(Source_Detail detail, String isSuspicious, List<String> plagiarizedSections, String otherStudentCode, double plagiarismPercentage) {
         Score score = scoreRepository.findByStudentStudentId(detail.getStudent().getStudentId());
-        System.out.println("Set score record for student " + detail.getStudent().getStudentId());
-
-        if (isSuspicious) {
-            if (plagiarizedSections.size() > 5) { // Kiểm tra mức độ giống nhau
-                score.setFlagReason("Definitely plagiarism with students " + otherStudentId + ".\nWith plagiarized sections" + plagiarizedSections);
-                score.setFlag(true);
-                System.out.println("Set plagiarism flag for student " + detail.getStudent().getStudentId());
-            } else {
-                score.setFlagReason("Possibility of plagiarism with students " + otherStudentId + ".\nWith plagiarized sections" + plagiarizedSections);
-                score.setFlag(false);
-                System.out.println("Set non-plagiarism flag for student " + detail.getStudent().getStudentId());
-            }
+        if (isSuspicious != null) {
+            score.setPlagiarismReason(
+                    "Plagiarism percentage: " + String.format("%.2f", plagiarismPercentage)
+                    + "% with students: " + otherStudentCode);
+            score.setCodePlagiarism(plagiarizedSections.toString());
+            score.setLevelOfPlagiarism(isSuspicious);
 
         } else {
-            score.setFlag(null);
-            score.setFlagReason("No plagiarism");
-            System.out.println("Set no flag for student " + detail.getStudent().getStudentId());
+            if(!checkPlagiarismExist(detail.getStudent().getStudentId())){
+                score.setLevelOfPlagiarism("No plagiarism");
+                score.setPlagiarismReason("N/A");
+                score.setCodePlagiarism("N/A");
+            }
         }
         return score;
+    }
+
+    private boolean checkPlagiarismExist(Long studentId) {
+        Score score = scoreRepository.findByStudentStudentId(studentId);
+        if (score != null) {
+            String plagiarismReason = score.getPlagiarismReason();
+            if(plagiarismReason != null && !plagiarismReason.equals("N/A")) return true;
+        }
+        return false;
     }
 }

@@ -1,6 +1,9 @@
 package com.CodeEvalCrew.AutoScore.services.plagiarism_check_service;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.MalformedInputException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CodeNormalizer {
+
     @SuppressWarnings("CallToPrintStackTrace")
     String normalizeCode(String folderPath) {
         StringBuilder combinedCode = new StringBuilder();
@@ -24,12 +28,9 @@ public class CodeNormalizer {
 
             // Đọc và kết hợp mã từ từng tệp .cs
             for (Path path : filePaths.collect(Collectors.toList())) {
-                try {
-                    String code = Files.readString(path);
+                String code = readFileWithFallbackEncoding(path); // Đọc tệp với mã hóa dự phòng
+                if (!code.isEmpty()) {
                     combinedCode.append(code).append("\n");
-                } catch (IOException e) {
-                    System.err.println("Error reading file: " + path);
-                    e.printStackTrace(); // In lỗi chi tiết nhưng không dừng chương trình
                 }
             }
 
@@ -71,5 +72,29 @@ public class CodeNormalizer {
             e.printStackTrace();
             return "";
         }
+    }
+
+    // Hàm đọc tệp với mã hóa UTF-8 và thử mã hóa khác nếu gặp lỗi
+    @SuppressWarnings("CallToPrintStackTrace")
+    private String readFileWithFallbackEncoding(Path path) {
+        try {
+            // Thử đọc tệp với mã hóa UTF-8
+            return Files.readString(path, StandardCharsets.UTF_8);
+        } catch (MalformedInputException e) {
+            System.err.println("UTF-8 decoding failed for file: " + path + ", attempting ISO-8859-1");
+            try {
+                // Nếu UTF-8 thất bại, thử đọc bằng ISO-8859-1
+                return Files.readString(path, Charset.forName("ISO-8859-1"));
+            } catch (IOException ex) {
+                System.err.println("Error reading file with ISO-8859-1 encoding: " + path);
+                ex.printStackTrace();
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading file: " + path);
+            e.printStackTrace();
+        }
+
+        // Nếu không thể đọc tệp, trả về chuỗi rỗng
+        return "";
     }
 }

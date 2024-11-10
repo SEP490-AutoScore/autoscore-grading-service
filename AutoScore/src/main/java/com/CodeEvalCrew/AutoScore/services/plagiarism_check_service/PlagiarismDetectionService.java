@@ -30,6 +30,8 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     private final ScoreRepository scoreRepository;
     private final Set<String> fingerprintDatabase = new HashSet<>();
     private final List<CompilationUnit> studentASTList = new ArrayList<>();
+    private static final int THRESHOLD_LOW = 60;
+    private static final int THRESHOLD_HIGH = 80;
 
     public PlagiarismDetectionService(SourceDetailRepository sourceDetailRepository, ASTComparator astComparator,
             CodeNormalizer codeNormalizer, NGramGenerator nGramGenerator, FingerprintGenerator fingerprintGenerator,
@@ -46,190 +48,162 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     @Override
     public void runPlagiarismDetection(List<StudentSourceInfoDTO> sourceDetailsDTO, String examType, Long organizationId) {
         System.out.println("Starting plagiarism detection for " + sourceDetailsDTO.size() + " source details.");
-        fingerprintDatabase.clear();
-        studentASTList.clear();
-        // Lấy danh sách source detail dựa vào campus và exam type
+
         Exam_Type_Enum examTypeEnum = Exam_Type_Enum.valueOf(examType);
         List<Source_Detail> dbSourceDetails = sourceDetailRepository.findAllByTypeAndStudentOrganizationOrganizationId(examTypeEnum, organizationId);
-        // Giai đoạn 1: Chuẩn hóa và N-grams
-        List<Source_Detail> phase1PassedStudents = runNormalizationAndNGrams(sourceDetailsDTO);
-        System.out.println("Phase 1 completed. Number of students passed: " + phase1PassedStudents.size());
 
-        // Giai đoạn 2: So sánh N-grams
-        List<Source_Detail> phase2PassedStudents = runNGramsComparison(phase1PassedStudents);
-        System.out.println("Phase 2 completed. Number of students passed: " + phase2PassedStudents.size());
+        // Chuẩn hóa và N-grams
+        System.out.println("Normalizing and generating N-grams for all students.");
+        for (StudentSourceInfoDTO studentSource : sourceDetailsDTO) {
+            Optional<Source_Detail> optionalDetail = sourceDetailRepository.findById(studentSource.getSourceDetailId());
 
-        // Giai đoạn 3: Fingerprinting và LSH
-        List<Source_Detail> phase3PassedStudents = runFingerprintingAndLSH(phase2PassedStudents);
-        System.out.println("Phase 3 completed. Number of students passed: " + phase3PassedStudents.size());
-
-        // Giai đoạn 4: So sánh AST toàn diện
-        runASTComparison(phase3PassedStudents);
-    }
-
-    private List<Source_Detail> runNormalizationAndNGrams(List<StudentSourceInfoDTO> sourceDetailsDTO) {
-        List<Source_Detail> passedStudents = new ArrayList<>();
-        System.out.println("Starting normalization and N-grams generation for " + sourceDetailsDTO.size() + " source details.");
-
-        for (StudentSourceInfoDTO detailDTO : sourceDetailsDTO) {
-            Optional<Source_Detail> optionalDetail = sourceDetailRepository.findById(detailDTO.getSourceDetailId());
             if (optionalDetail.isPresent()) {
-                Source_Detail detail = optionalDetail.get();
-                if (detail == null) {
-                    System.err.println("Source detail not found for ID: " + detailDTO.getSourceDetailId());
-                    continue; // Skip this iteration
-                }
+                Source_Detail studentDetail = optionalDetail.get();
 
-                String normalizedCode = codeNormalizer.normalizeCode(detail.getStudentSourceCodePath());
-                System.out.println("Normalized code for student ID: " + detail.getStudent().getStudentId());
-                List<String> nGrams = nGramGenerator.generateNGrams(normalizedCode, 5); // 5-grams
+                // Làm mới fingerprintDatabase cho sinh viên hiện tại
+                fingerprintDatabase.clear();
 
-                detail.setNormalizedCode(normalizedCode);
-
-                // Xóa nGrams cũ để tránh orphan
-                if (detail.getNGrams() != null) {
-                    detail.getNGrams().clear();
-                }
-
-                // Tạo danh sách NGram từ danh sách chuỗi nGrams
-                List<NGram> nGramEntities = nGrams.stream()
-                        .map(nGramValue -> {
-                            NGram nGramEntity = new NGram();
-                            nGramEntity.setNGramValue(nGramValue);
-                            nGramEntity.setSourceDetail(detail);
-                            return nGramEntity;
-                        })
-                        .collect(Collectors.toList());
-
-                // Thiết lập danh sách NGram vào detail
-                detail.getNGrams().addAll(nGramEntities);
-
-                // Thêm detail vào danh sách sinh viên đã qua giai đoạn chuẩn hóa
-                passedStudents.add(detail);
+                runNormalizationAndNGramsComparison(studentDetail, dbSourceDetails);
             }
         }
-        System.out.println("Normalization and N-grams generation completed. Number of students processed: " + passedStudents.size());
-        return passedStudents;
+
+        // Fingerprinting và LSH, kiểm tra trùng lặp với sinh viên khác
+        System.out.println("Running fingerprinting and LSH for all students.");
+        for (StudentSourceInfoDTO studentSource : sourceDetailsDTO) {
+            Optional<Source_Detail> optionalDetail = sourceDetailRepository.findById(studentSource.getSourceDetailId());
+
+            if (optionalDetail.isPresent()) {
+                Source_Detail studentDetail = optionalDetail.get();
+
+                runFingerprintingAndLSH(studentDetail, dbSourceDetails);
+            }
+        }
+
+        // // Giai đoạn 4 cho tất cả sinh viên nếu cần
+        // for (StudentSourceInfoDTO studentSource : sourceDetailsDTO) {
+        //     Optional<Source_Detail> optionalDetail = sourceDetailRepository.findById(studentSource.getSourceDetailId());
+        //     if (optionalDetail.isPresent()) {
+        //         Source_Detail studentDetail = optionalDetail.get();
+        //         // Giai đoạn 4: So sánh AST toàn diện
+        //         runASTComparison(studentDetail, dbSourceDetails);
+        //     }
+        // }
+        System.out.println("Plagiarism detection completed for all students.");
     }
 
-    private List<Source_Detail> runNGramsComparison(List<Source_Detail> sourceDetails) {
-        List<Source_Detail> passedStudents = new ArrayList<>();
-        System.out.println("Starting N-grams comparison for " + sourceDetails.size() + " source details.");
+    private boolean runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
+        // Bước 1: Chuẩn hóa mã nguồn của sinh viên và tạo N-grams
+        String normalizedCode = codeNormalizer.normalizeCode(studentDetail.getStudentSourceCodePath());
+        List<String> nGrams = nGramGenerator.generateNGrams(normalizedCode, 5);
 
-        for (Source_Detail detail : sourceDetails) {
-            boolean hasSuspiciousNGram = false;
-            List<String> plagiarizedSections = new ArrayList<>(); // Lưu các NGram trùng lặp
-            String otherStudentId = null; // ID của sinh viên có mã trùng lặp
+        studentDetail.setNormalizedCode(normalizedCode);
+        studentDetail.getNGrams().clear();
+        List<NGram> nGramEntities = nGrams.stream()
+                .map(nGramValue -> {
+                    NGram nGramEntity = new NGram();
+                    nGramEntity.setNGramValue(nGramValue);
+                    nGramEntity.setSourceDetail(studentDetail);
+                    return nGramEntity;
+                }).collect(Collectors.toList());
+        studentDetail.getNGrams().addAll(nGramEntities);
 
-            // Duyệt qua các NGram của detail
-            for (NGram nGramEntity : detail.getNGrams()) {
-                String nGram = nGramEntity.getNGramValue();
-                if (fingerprintDatabase.contains(nGram)) {
-                    hasSuspiciousNGram = true;
-                    plagiarizedSections.add(nGram); // Thêm NGram vào danh sách trùng lặp
-                    otherStudentId = fingerprintGenerator.getSimilarStudentId(nGram); // Tìm ID sinh viên có mã trùng
-
-                    System.out.println("Suspicious NGram found for student ID: " + detail.getStudent().getStudentId());
-                }
+        // Bước 2: Kiểm tra trùng lặp với các sinh viên khác trong cơ sở dữ liệu
+        for (Source_Detail dbDetail : dbSourceDetails) {
+            System.out.println("Phase 1: Comparing " + studentDetail.getStudent().getStudentId() + " with " + dbDetail.getStudent().getStudentId());
+            // Bỏ qua nếu là cùng sinh viên
+            if (studentDetail.getStudent().getStudentId().equals(dbDetail.getStudent().getStudentId())) {
+                continue;
             }
 
-            if (!hasSuspiciousNGram) {
-                // Thêm sinh viên vào danh sách nếu không có NGram nào trùng
-                passedStudents.add(detail);
-            } else {
-                // Nếu có đạo văn, tạo một đối tượng Score với thông tin chi tiết
-                Score score = scoreManager.setScoreRecord(detail, true, plagiarizedSections, otherStudentId);
+            // Tập hợp N-grams của sinh viên hiện tại và sinh viên trong cơ sở dữ liệu
+            Set<String> studentNGramsSet = nGrams.stream().collect(Collectors.toSet());
+            Set<String> dbNGramsSet = dbDetail.getNGrams().stream().map(NGram::getNGramValue).collect(Collectors.toSet());
+
+            // Kiểm tra trùng lặp bằng cách tính tỷ lệ N-grams trùng lặp
+            int totalNGrams = studentNGramsSet.size();
+            studentNGramsSet.retainAll(dbNGramsSet); // Giữ lại các N-grams trùng lặp
+            int matchingNGrams = studentNGramsSet.size();
+
+            // Tính tỷ lệ trùng lặp (matchingNGrams / totalNGrams) và kiểm tra ngưỡng
+            double overlapPercentage = (double) matchingNGrams / totalNGrams * 100;
+            String isSuspicious = null;
+
+            if (overlapPercentage >= THRESHOLD_HIGH) {
+                isSuspicious = "Definitely Plagiarized";
+            } else if (overlapPercentage >= THRESHOLD_LOW && overlapPercentage < THRESHOLD_HIGH) {
+                isSuspicious = "Possibly Plagiarized";
+            }
+
+            if (isSuspicious != null) {
+                // Đánh dấu đạo văn nếu tỷ lệ trùng lặp theo yêu cầu
+                Score score = scoreManager.setScoreRecord(studentDetail, isSuspicious, new ArrayList<>(studentNGramsSet), dbDetail.getStudent().getStudentCode(), overlapPercentage);
                 scoreRepository.save(score);
-
-                System.out.println("Suspicious NGram detected for student ID: " + detail.getStudent().getStudentId()
-                        + ", similar to student ID: " + otherStudentId);
+                return false; // Phát hiện đạo văn
             }
+            Score score = scoreManager.setScoreRecord(studentDetail, null, null, null, overlapPercentage);
+            scoreRepository.save(score);
         }
-        System.out.println("N-grams comparison completed. Number of students passed: " + passedStudents.size());
-        return passedStudents;
+        return true; // Không phát hiện đạo văn
     }
 
-    private List<Source_Detail> runFingerprintingAndLSH(List<Source_Detail> sourceDetails) {
-        List<Source_Detail> passedStudents = new ArrayList<>();
-        System.out.println("Starting fingerprinting and LSH for " + sourceDetails.size() + " source details.");
+    private boolean runFingerprintingAndLSH(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
+        String normalizedCode = studentDetail.getNormalizedCode();
+        String fingerprint = fingerprintGenerator.generateFingerprint(normalizedCode);
+        List<String> segments = fingerprintGenerator.generateSegments(normalizedCode);
 
-        for (Source_Detail detail : sourceDetails) {
-            String normalizedCode = detail.getNormalizedCode();
-            String fingerprint = fingerprintGenerator.generateFingerprint(normalizedCode);
-            List<String> segments = fingerprintGenerator.generateSegments(normalizedCode);
+        for (Source_Detail dbDetail : dbSourceDetails) {
+            System.out.println("Phase 2: Comparing " + studentDetail.getStudent().getStudentId() + " with " + dbDetail.getStudent().getStudentId());
+            // Bỏ qua so sánh với chính sinh viên này
+            if (studentDetail.getStudent().getStudentId().equals(dbDetail.getStudent().getStudentId())) {
+                continue;
+            }
 
-            LSHCheckResult checkResult = fingerprintGenerator.lshCheck(fingerprint, detail.getStudent().getStudentCode(), segments);
+            // Tạo fingerprintDatabase riêng biệt để tránh xung đột
+            LSHCheckResult checkResult = fingerprintGenerator.lshCheck(fingerprint, studentDetail.getStudent().getStudentCode(), segments);
 
-            if (!checkResult.isSuspicious()) {
-                passedStudents.add(detail);
-            } else {
+            if (checkResult.getIsSuspicious() != null) {
                 List<String> plagiarizedSegments = checkResult.getMatchingSegments();
-                String otherStudentId = checkResult.getOtherStudentId();
-                // Lấy đoạn mã đầy đủ xung quanh các N-gram trùng lặp
                 List<String> plagiarizedCodeBlocks = extractFullPlagiarizedCode(normalizedCode, plagiarizedSegments);
-
-                Score score = scoreManager.setScoreRecord(detail, true, plagiarizedCodeBlocks, otherStudentId);
+                Score score = scoreManager.setScoreRecord(studentDetail, checkResult.getIsSuspicious(), plagiarizedCodeBlocks, dbDetail.getStudent().getStudentCode(), checkResult.getMatchPercentage());
                 scoreRepository.save(score);
-
-                System.out.println("Detected possible plagiarism for student ID: " + detail.getStudent().getStudentId()
-                        + ", matching student ID: " + otherStudentId);
+                return false; // Phát hiện đạo văn
+            } else {
+                Score score = scoreManager.setScoreRecord(studentDetail, null, null, null, checkResult.getMatchPercentage());
+                scoreRepository.save(score);
             }
         }
-        System.out.println("Fingerprinting and LSH completed. Number of students passed: " + passedStudents.size());
-        return passedStudents;
+        return true; // Không phát hiện đạo văn
     }
 
-    private void runASTComparison(List<Source_Detail> sourceDetails) {
-        System.out.println("Start comparing AST for " + sourceDetails.size() + " students.");
-        astComparator.createASTMatrix(sourceDetails);
-
-        for (int i = 0; i < sourceDetails.size(); i++) {
-            Source_Detail detail1 = sourceDetails.get(i);
-
-            for (int j = 0; j < sourceDetails.size(); j++) {
-                if (i == j) {
-                    continue;  // Bỏ qua so sánh với chính mình
-                }
-                Source_Detail detail2 = sourceDetails.get(j);
-
-                System.out.println("Comparing AST of student " + detail1.getStudent().getStudentId()
-                        + " with student " + detail2.getStudent().getStudentId());
-
-                List<String> similarSections = astComparator.extractSimilarSections(detail1, detail2);
-
-                if (!similarSections.isEmpty()) {
-                    // Đánh dấu đạo văn nếu có đoạn mã giống nhau
-                    Score score1 = scoreManager.setScoreRecord(detail1, true, similarSections, detail2.getStudent().getStudentCode());
-                    Score score2 = scoreManager.setScoreRecord(detail2, true, similarSections, detail1.getStudent().getStudentCode());
-
-                    scoreRepository.save(score1);
-                    scoreRepository.save(score2);
-                } else {
-                    Score score = scoreManager.setScoreRecord(detail1, false, null, null);
-                    scoreRepository.save(score);
-                }
-            }
-        }
-        System.out.println("Complete AST comparison.");
-    }
-
+    // private void runASTComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
+    //     for (Source_Detail dbDetail : dbSourceDetails) {
+    //         if (studentDetail.getStudent().getStudentId().equals(dbDetail.getStudent().getStudentId())) {
+    //             continue; // Bỏ qua kiểm tra với chính sinh viên này
+    //         }
+    //         List<String> similarSections = astComparator.extractSimilarSections(studentDetail, dbDetail);
+    //         if (!similarSections.isEmpty()) {
+    //             Score score = scoreManager.setScoreRecord(studentDetail, true, similarSections, dbDetail.getStudent().getStudentCode());
+    //             scoreRepository.save(score);
+    //         }
+    //     }
+    // }
     private List<String> extractFullPlagiarizedCode(String normalizedCode, List<String> plagiarizedSegments) {
         List<String> codeBlocks = new ArrayList<>();
         StringBuilder currentBlock = new StringBuilder();
         int lastEndIndex = -1;
-    
+
         for (String segment : plagiarizedSegments) {
             int index = normalizedCode.indexOf(segment);
-    
+
             if (index != -1) {
                 // Đảm bảo index và lastEndIndex nằm trong giới hạn
                 index = Math.max(0, Math.min(index, normalizedCode.length()));
                 lastEndIndex = Math.max(0, Math.min(lastEndIndex, normalizedCode.length()));
-    
+
                 // Kiểm tra nếu đoạn mã hiện tại liền kề hoặc trùng với đoạn mã trước đó
                 if (currentBlock.length() > 0 && index <= lastEndIndex) {
                     int overlapLength = lastEndIndex - index;
-    
+
                     // Đảm bảo không xảy ra tình trạng chỉ số ngoài giới hạn khi dùng substring
                     if (overlapLength < segment.length()) {
                         currentBlock.append(segment.substring(overlapLength));
@@ -242,17 +216,17 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
                     // Khởi tạo một đoạn mã mới
                     currentBlock = new StringBuilder(segment);
                 }
-    
+
                 // Cập nhật vị trí kết thúc của đoạn mã hiện tại, đảm bảo không vượt quá giới hạn
                 lastEndIndex = Math.min(index + segment.length(), normalizedCode.length());
             }
         }
-    
+
         // Thêm đoạn mã cuối cùng nếu có
         if (currentBlock.length() > 0) {
             codeBlocks.add(currentBlock.toString());
         }
-    
+
         return codeBlocks;
-    }    
+    }
 }

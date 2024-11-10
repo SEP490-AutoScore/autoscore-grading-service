@@ -34,9 +34,10 @@ public class Score {
 
     private LocalDateTime gradedAt;
 
-    private Boolean flag; // 0 = không bị đánh cờ, 1 = kiểm tra đặc biệt
+    private String levelOfPlagiarism;
+    private String plagiarismReason;
     @Lob
-    private String flagReason;
+    private String codePlagiarism;
 
     //Relationship
     //n-1 exam paper

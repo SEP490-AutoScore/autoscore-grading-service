@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LSHCheckResult {
-    private boolean isSuspicious;
+    private String isSuspicious;
     private List<String> matchingSegments;
     private String otherStudentId;
+    private double matchPercentage;
 }
