@@ -39,6 +39,10 @@ public class Score {
     @Lob
     private String codePlagiarism;
 
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
+    private String logRunPostman;
+
     //Relationship
     //n-1 exam paper
     @ManyToOne
