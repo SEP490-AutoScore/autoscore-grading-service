@@ -18,10 +18,11 @@ public class AutoScorePostmanController {
     @Autowired
     private IAutoscorePostmanService autoscorePostmanService;
 
+   
     @GetMapping("")
     public List<StudentSourceInfoDTO> gradingFunction(
         @RequestParam Long examPaperId,
-        @RequestParam(name = "numberDeploy", required = false, defaultValue = "3") int numberDeploy
+        @RequestParam(name = "numberDeploy", required = false, defaultValue = "2") int numberDeploy
     ) {
         return autoscorePostmanService.gradingFunction(examPaperId, numberDeploy);
     }
