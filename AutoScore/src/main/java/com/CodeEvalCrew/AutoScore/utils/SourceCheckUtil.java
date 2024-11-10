@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
@@ -29,7 +30,8 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Important;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class SourceCheckUtil {
+@Service
+public class SourceCheckUtil implements ISourceCheckUtil{
     private static final String SECTION_STRING = "ConnectionStrings";
     private static final String NODE_DATABASE_STRING = "MyDB";
     private static final String APPSETTING_NAME = "appsettings.json";
