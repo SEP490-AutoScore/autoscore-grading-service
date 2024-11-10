@@ -17,9 +17,6 @@ import com.CodeEvalCrew.AutoScore.services.plagiarism_check_service.IPlagiarismD
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
-import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.StudentForGrading;
-
 
 @RestController
 @RequestMapping("/api/grading")
@@ -42,6 +39,8 @@ public class GradingController {
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
+            autoscorePostmanService.gradingFunction(request.getExamPaperId(), 3);
+            plagiarismDetectionService.runPlagiarismDetection(listSourceInfoDTOs, request.getExamType(), request.getOrganizationId());
             return new ResponseEntity<>(HttpStatus.OK);
         } catch(NotFoundException e){
             return new ResponseEntity<>(e.getMessage() ,HttpStatus.INTERNAL_SERVER_ERROR);

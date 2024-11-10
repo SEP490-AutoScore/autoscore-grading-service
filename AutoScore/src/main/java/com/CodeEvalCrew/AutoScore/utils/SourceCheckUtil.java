@@ -97,7 +97,7 @@ public class SourceCheckUtil implements ISourceCheckUtil{
         if (jsonPath.isEmpty()) {
             throw new NotFoundException(fileName + " not found");
         }
-        boolean flag = analyzeAppSettings(jsonPath.toString(), section, dbNode);
+        boolean flag = analyzeAppSettings(jsonPath.get(), section, dbNode);
         if (flag) {
             return Optional.of("PASS");  
         }
@@ -244,7 +244,6 @@ public class SourceCheckUtil implements ISourceCheckUtil{
             
         } catch (IOException e) {
             System.err.println("Error reading or parsing file: " + filePath);
-            e.printStackTrace();
         }
         return result;
     }
