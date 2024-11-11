@@ -1,5 +1,8 @@
 package com.CodeEvalCrew.AutoScore.services.plagiarism_check_service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -12,9 +15,7 @@ import org.springframework.stereotype.Service;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Type_Enum;
 import com.CodeEvalCrew.AutoScore.models.Entity.NGram;
-import com.CodeEvalCrew.AutoScore.models.Entity.Score;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
-import com.CodeEvalCrew.AutoScore.repositories.score_repository.ScoreRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 import com.github.javaparser.ast.CompilationUnit;
 
@@ -27,21 +28,18 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     private final NGramGenerator nGramGenerator;
     private final FingerprintGenerator fingerprintGenerator;
     private final ScoreManager scoreManager;
-    private final ScoreRepository scoreRepository;
     private final Set<String> fingerprintDatabase = new HashSet<>();
     private final List<CompilationUnit> studentASTList = new ArrayList<>();
     private static final int THRESHOLD_LOW = 60;
     private static final int THRESHOLD_HIGH = 80;
 
     public PlagiarismDetectionService(SourceDetailRepository sourceDetailRepository, ASTComparator astComparator,
-            CodeNormalizer codeNormalizer, NGramGenerator nGramGenerator, FingerprintGenerator fingerprintGenerator,
-            ScoreRepository scoreRepository, ScoreManager scoreManager) {
+            CodeNormalizer codeNormalizer, NGramGenerator nGramGenerator, FingerprintGenerator fingerprintGenerator, ScoreManager scoreManager) {
         this.sourceDetailRepository = sourceDetailRepository;
         this.astComparator = astComparator;
         this.codeNormalizer = codeNormalizer;
         this.nGramGenerator = nGramGenerator;
         this.fingerprintGenerator = fingerprintGenerator;
-        this.scoreRepository = scoreRepository;
         this.scoreManager = scoreManager;
     }
 
@@ -91,11 +89,12 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
         System.out.println("Plagiarism detection completed for all students.");
     }
 
-    private boolean runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
+    private void runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
         // Bước 1: Chuẩn hóa mã nguồn của sinh viên và tạo N-grams
         String normalizedCode = codeNormalizer.normalizeCode(studentDetail.getStudentSourceCodePath());
         List<String> nGrams = nGramGenerator.generateNGrams(normalizedCode, 5);
 
+        // Lưu lại mã đã chuẩn hóa và danh sách N-grams
         studentDetail.setNormalizedCode(normalizedCode);
         studentDetail.getNGrams().clear();
         List<NGram> nGramEntities = nGrams.stream()
@@ -107,24 +106,21 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
                 }).collect(Collectors.toList());
         studentDetail.getNGrams().addAll(nGramEntities);
 
-        // Bước 2: Kiểm tra trùng lặp với các sinh viên khác trong cơ sở dữ liệu
+        // Bước 2: So sánh với từng sinh viên trong cơ sở dữ liệu để tìm các đoạn mã đạo văn
         for (Source_Detail dbDetail : dbSourceDetails) {
             System.out.println("Phase 1: Comparing " + studentDetail.getStudent().getStudentId() + " with " + dbDetail.getStudent().getStudentId());
-            // Bỏ qua nếu là cùng sinh viên
+
             if (studentDetail.getStudent().getStudentId().equals(dbDetail.getStudent().getStudentId())) {
                 continue;
             }
 
-            // Tập hợp N-grams của sinh viên hiện tại và sinh viên trong cơ sở dữ liệu
-            Set<String> studentNGramsSet = nGrams.stream().collect(Collectors.toSet());
+            Set<String> studentNGramsSet = new HashSet<>(nGrams);
             Set<String> dbNGramsSet = dbDetail.getNGrams().stream().map(NGram::getNGramValue).collect(Collectors.toSet());
 
-            // Kiểm tra trùng lặp bằng cách tính tỷ lệ N-grams trùng lặp
             int totalNGrams = studentNGramsSet.size();
-            studentNGramsSet.retainAll(dbNGramsSet); // Giữ lại các N-grams trùng lặp
+            studentNGramsSet.retainAll(dbNGramsSet);
             int matchingNGrams = studentNGramsSet.size();
 
-            // Tính tỷ lệ trùng lặp (matchingNGrams / totalNGrams) và kiểm tra ngưỡng
             double overlapPercentage = (double) matchingNGrams / totalNGrams * 100;
             String isSuspicious = null;
 
@@ -135,44 +131,53 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             }
 
             if (isSuspicious != null) {
-                // Đánh dấu đạo văn nếu tỷ lệ trùng lặp theo yêu cầu
-                Score score = scoreManager.setScoreRecord(studentDetail, isSuspicious, new ArrayList<>(studentNGramsSet), dbDetail.getStudent().getStudentCode(), overlapPercentage);
-                scoreRepository.save(score);
-                return false; // Phát hiện đạo văn
+                // Gọi hàm extractFullPlagiarizedCode để lấy các đoạn mã đạo văn cụ thể
+                List<String> plagiarizedSegments = new ArrayList<>(studentNGramsSet);
+                CodePlagiarismResult plagiarizedCodeResult = extractFullPlagiarizedCode(
+                        normalizedCode, plagiarizedSegments, studentDetail, dbDetail);
+
+                // Lưu kết quả vào cơ sở dữ liệu thông qua saveScoreRecord
+                List<CodePlagiarismResult> codePlagiarismResults = new ArrayList<>();
+                codePlagiarismResults.add(plagiarizedCodeResult);
+                scoreManager.saveScoreRecord(studentDetail, isSuspicious, codePlagiarismResults, dbDetail.getStudent().getStudentCode(), overlapPercentage);
+            } else {
+                scoreManager.saveScoreRecord(studentDetail, null, null, null, overlapPercentage);
             }
-            Score score = scoreManager.setScoreRecord(studentDetail, null, null, null, overlapPercentage);
-            scoreRepository.save(score);
         }
-        return true; // Không phát hiện đạo văn
     }
 
-    private boolean runFingerprintingAndLSH(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
+    private void runFingerprintingAndLSH(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
         String normalizedCode = studentDetail.getNormalizedCode();
         String fingerprint = fingerprintGenerator.generateFingerprint(normalizedCode);
         List<String> segments = fingerprintGenerator.generateSegments(normalizedCode);
+        List<CodePlagiarismResult> codePlagiarismResults = new ArrayList<>();
+        LSHCheckResult checkResult = null;
 
         for (Source_Detail dbDetail : dbSourceDetails) {
-            System.out.println("Phase 2: Comparing " + studentDetail.getStudent().getStudentId() + " with " + dbDetail.getStudent().getStudentId());
-            // Bỏ qua so sánh với chính sinh viên này
             if (studentDetail.getStudent().getStudentId().equals(dbDetail.getStudent().getStudentId())) {
-                continue;
+                continue; // Bỏ qua kiểm tra với chính sinh viên này
             }
 
-            // Tạo fingerprintDatabase riêng biệt để tránh xung đột
-            LSHCheckResult checkResult = fingerprintGenerator.lshCheck(fingerprint, studentDetail.getStudent().getStudentCode(), segments);
+            checkResult = fingerprintGenerator.lshCheck(fingerprint, studentDetail.getStudent().getStudentCode(), segments);
 
-            if (checkResult.getIsSuspicious() != null) {
-                List<String> plagiarizedSegments = checkResult.getMatchingSegments();
-                List<String> plagiarizedCodeBlocks = extractFullPlagiarizedCode(normalizedCode, plagiarizedSegments);
-                Score score = scoreManager.setScoreRecord(studentDetail, checkResult.getIsSuspicious(), plagiarizedCodeBlocks, dbDetail.getStudent().getStudentCode(), checkResult.getMatchPercentage());
-                scoreRepository.save(score);
-                return false; // Phát hiện đạo văn
-            } else {
-                Score score = scoreManager.setScoreRecord(studentDetail, null, null, null, checkResult.getMatchPercentage());
-                scoreRepository.save(score);
+            if (checkResult.getIsSuspicious() != null && !checkResult.getMatchingSegments().isEmpty()) {
+                // Chỉ thực hiện khi có các đoạn mã nghi ngờ là đạo văn
+                CodePlagiarismResult plagiarizedCodeResult = extractFullPlagiarizedCode(
+                        normalizedCode, checkResult.getMatchingSegments(), studentDetail, dbDetail);
+
+                // Chỉ thêm vào nếu có các đoạn mã thực tế để lưu trữ
+                if (plagiarizedCodeResult.getSelfCode() != null && !plagiarizedCodeResult.getSelfCode().isEmpty()) {
+                    codePlagiarismResults.add(plagiarizedCodeResult);
+                }
             }
         }
-        return true; // Không phát hiện đạo văn
+
+        // Chỉ lưu nếu có kết quả đạo văn thực sự
+        if (!codePlagiarismResults.isEmpty() &&  checkResult.getIsSuspicious() != null) {
+            scoreManager.saveScoreRecord(studentDetail, checkResult.getIsSuspicious(), codePlagiarismResults, null, 0);
+        } else {
+            scoreManager.saveScoreRecord(studentDetail, null, null, null, 0);
+        }
     }
 
     // private void runASTComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
@@ -187,46 +192,88 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     //         }
     //     }
     // }
-    private List<String> extractFullPlagiarizedCode(String normalizedCode, List<String> plagiarizedSegments) {
-        List<String> codeBlocks = new ArrayList<>();
+    @SuppressWarnings("CallToPrintStackTrace")
+    private CodePlagiarismResult extractFullPlagiarizedCode(String normalizedCode, List<String> plagiarizedSegments, Source_Detail studentSourceDetail, Source_Detail dbStudentSourceDetail) {
+        List<String> studentCodeBlocks = new ArrayList<>();
         StringBuilder currentBlock = new StringBuilder();
+        CodePlagiarismResult result = new CodePlagiarismResult();
         int lastEndIndex = -1;
 
+        // Bước 1: Tạo danh sách các đoạn mã bị nghi ngờ là đạo văn từ `plagiarizedSegments`
         for (String segment : plagiarizedSegments) {
             int index = normalizedCode.indexOf(segment);
 
             if (index != -1) {
-                // Đảm bảo index và lastEndIndex nằm trong giới hạn
                 index = Math.max(0, Math.min(index, normalizedCode.length()));
                 lastEndIndex = Math.max(0, Math.min(lastEndIndex, normalizedCode.length()));
 
-                // Kiểm tra nếu đoạn mã hiện tại liền kề hoặc trùng với đoạn mã trước đó
                 if (currentBlock.length() > 0 && index <= lastEndIndex) {
                     int overlapLength = lastEndIndex - index;
-
-                    // Đảm bảo không xảy ra tình trạng chỉ số ngoài giới hạn khi dùng substring
                     if (overlapLength < segment.length()) {
                         currentBlock.append(segment.substring(overlapLength));
                     }
                 } else {
-                    // Thêm đoạn mã hiện tại vào danh sách nếu có nội dung
                     if (currentBlock.length() > 0) {
-                        codeBlocks.add(currentBlock.toString());
+                        studentCodeBlocks.add(currentBlock.toString());
                     }
-                    // Khởi tạo một đoạn mã mới
                     currentBlock = new StringBuilder(segment);
                 }
-
-                // Cập nhật vị trí kết thúc của đoạn mã hiện tại, đảm bảo không vượt quá giới hạn
                 lastEndIndex = Math.min(index + segment.length(), normalizedCode.length());
             }
         }
-
-        // Thêm đoạn mã cuối cùng nếu có
         if (currentBlock.length() > 0) {
-            codeBlocks.add(currentBlock.toString());
+            studentCodeBlocks.add(currentBlock.toString());
         }
 
-        return codeBlocks;
+        // Bước 2: Duyệt qua các tệp của sinh viên và tìm các đoạn mã đạo văn tương ứng
+        StringBuilder sourceCode = new StringBuilder();
+        try {
+            Files.walk(Paths.get(studentSourceDetail.getStudentSourceCodePath()))
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".cs"))
+                    .forEach(path -> {
+                        try {
+                            String fileContent = new String(Files.readAllBytes(path));
+                            for (String block : studentCodeBlocks) {
+                                if (fileContent.contains(block)) {
+                                    sourceCode.append(block).append("\n"); // Chỉ thêm đoạn mã đạo văn tìm thấy
+                                }
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Bước 3: Duyệt qua các tệp trong cơ sở dữ liệu sinh viên để tìm các đoạn mã đạo văn tương ứng
+        StringBuilder dbSourceCode = new StringBuilder();
+        try {
+            Files.walk(Paths.get(dbStudentSourceDetail.getStudentSourceCodePath()))
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".cs"))
+                    .forEach(path -> {
+                        try {
+                            String fileContent = new String(Files.readAllBytes(path));
+                            for (String block : studentCodeBlocks) {
+                                if (fileContent.contains(block)) {
+                                    dbSourceCode.append(block).append("\n"); // Chỉ thêm đoạn mã đạo văn tìm thấy
+                                }
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Thiết lập kết quả với các đoạn mã bị đạo văn từ sinh viên và cơ sở dữ liệu
+        result.setSelfCode(sourceCode.toString());
+        result.setStudentCodePlagiarism(dbStudentSourceDetail.getStudent().getStudentCode());
+        result.setStudentPlagiarism(dbSourceCode.toString());
+
+        return result;
     }
 }

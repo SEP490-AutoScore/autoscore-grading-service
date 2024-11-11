@@ -9,7 +9,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import lombok.AllArgsConstructor;
@@ -36,8 +35,6 @@ public class Score {
 
     private String levelOfPlagiarism;
     private String plagiarismReason;
-    @Lob
-    private String codePlagiarism;
 
     //Relationship
     //n-1 exam paper
