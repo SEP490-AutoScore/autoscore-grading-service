@@ -58,4 +58,6 @@ public class Score {
     @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Score_Detail> scoreDetails;
 
+    @OneToMany(mappedBy = "score", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Code_Plagiarism> codePlagiarisms;
 }
