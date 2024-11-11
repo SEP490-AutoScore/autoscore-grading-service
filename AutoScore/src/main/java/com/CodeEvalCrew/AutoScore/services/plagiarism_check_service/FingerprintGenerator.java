@@ -6,13 +6,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FingerprintGenerator {
-
     private static final int SEGMENT_LENGTH = 50;  // Độ dài mỗi đoạn
     private static final int THRESHOLD_LOW = 40;
     private static final int THRESHOLD_HIGH = 70;
@@ -47,7 +47,7 @@ public class FingerprintGenerator {
                 }
                 hexString.append(hex);
             }
-            System.out.println("Generated fingerprint for code.");
+            // System.out.println("Generated fingerprint for code.");
             return hexString.toString();
 
         } catch (NoSuchAlgorithmException e) {
@@ -59,13 +59,18 @@ public class FingerprintGenerator {
 
     // Hàm kiểm tra và lưu dấu vân tay, đồng thời lưu vào fingerprintDatabase nếu chưa có
     public LSHCheckResult lshCheck(String fingerprint, String studentId, List<String> segments) {
-        List<String> matchingSegments = new ArrayList<>();
+        List<String> matchingSegments = new CopyOnWriteArrayList<>();
         int totalSegments = segments.size();
         int matchCount = 0;
 
-        for (String segment : segments) {
+        List<String> safeSegments = new CopyOnWriteArrayList<>(segments);
+        for (String segment : safeSegments) {
             // Lấy danh sách các bản ghi hiện tại từ cơ sở dữ liệu hoặc tạo danh sách mới
-            List<FingerprintRecord> records = fingerprintDatabase.getOrDefault(segment, new ArrayList<>());
+            List<FingerprintRecord> records = fingerprintDatabase.get(segment);
+            if (records == null) {
+                records = new CopyOnWriteArrayList<>();
+                fingerprintDatabase.put(segment, records);
+            }
 
             // Kiểm tra xem segment này đã tồn tại trong cơ sở dữ liệu với sinh viên khác chưa
             boolean segmentMatched = false;
@@ -97,14 +102,17 @@ public class FingerprintGenerator {
         // Xác định sinh viên khác (nếu có) khi phát hiện đạo văn
         String otherStudentId = null;
         if (isSuspicious != null && !matchingSegments.isEmpty()) {
-            otherStudentId = fingerprintDatabase.get(matchingSegments.get(0)).get(0).getStudentId();
+            List<FingerprintRecord> records = fingerprintDatabase.get(matchingSegments.get(0));
+            if (records != null && !records.isEmpty()) {
+                otherStudentId = records.get(0).getStudentId();
+            }
         }
 
         return new LSHCheckResult(isSuspicious, matchingSegments, otherStudentId, matchPercentage);
     }
 
     public List<String> generateSegments(String normalizedCode) {
-        List<String> segments = new ArrayList<>();
+        List<String> segments = new CopyOnWriteArrayList<>();
 
         // Chia chuỗi `normalizedCode` thành các đoạn có độ dài `SEGMENT_LENGTH`
         for (int i = 0; i <= normalizedCode.length() - SEGMENT_LENGTH; i++) {
