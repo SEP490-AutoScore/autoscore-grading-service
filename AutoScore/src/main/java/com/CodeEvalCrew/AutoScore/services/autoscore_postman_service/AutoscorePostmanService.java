@@ -43,7 +43,6 @@ import org.springframework.stereotype.Service;
 import com.CodeEvalCrew.AutoScore.mappers.SourceDetailMapperforAutoscore;
 import com.CodeEvalCrew.AutoScore.models.DTO.ResponseDTO.StudentDeployResult;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
-import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoHaveScoreDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Database;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Question;
@@ -75,15 +74,15 @@ import com.github.dockerjava.okhttp.OkHttpDockerCmdExecFactory;
 @Service
 public class AutoscorePostmanService implements IAutoscorePostmanService {
 
-    private static final String DB_URL = "jdbc:sqlserver://ADMIN-PC\\SQLEXPRESS;databaseName=master;user=sa;password=1234567890;encrypt=false;trustServerCertificate=true;";
+    private static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
     private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    private static final String DB_SERVER = "192.168.2.8\\SQLEXPRESS";
+    private static final String DB_SERVER = "192.168.1.223\\SQLSERVER";
     private static final String DB_UID = "sa";
-    private static final String DB_PWD = "1234567890";
+    private static final String DB_PWD = "123456";
     private static final String DOCKER_DESKTOP_PATH = "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe";
-    private static final String NEWMAN_CMD_PATH = "C:\\Users\\Admin\\AppData\\Roaming\\npm\\newman.cmd";
+    private static final String NEWMAN_CMD_PATH = "C:\\Users\\nhatt\\AppData\\Roaming\\npm\\newman.cmd";
     private static final int BASE_PORT = 10000;
-    String directoryPath = "D:/Desktop/all collection postman";
+    String directoryPath = "C:\\Project\\AutoScore\\Grading";
 
     @Autowired
     private SourceRepository sourceRepository;
@@ -107,7 +106,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private PostmanForGradingRepository postmanForGradingRepository;
 
     @Override
-    public List<StudentSourceInfoHaveScoreDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
+    public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
             Long examPaperId, int numberDeploy) {
 
         // Chạy Postman Collection và lấy kết quả
@@ -141,12 +140,12 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         processStudentSolutions(studentSources, examPaperId, numberDeploy);
 
         // Filter for students with totalScore > 0
-        List<StudentSourceInfoHaveScoreDTO> studentsWithScores = studentSources.stream()
+        List<StudentSourceInfoDTO> studentsWithScores = studentSources.stream()
                 .filter(student -> {
                     Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudentId(), examPaperId);
                     return score != null && score.getTotalScore() > 0;
                 })
-                .map(student -> new StudentSourceInfoHaveScoreDTO(
+                .map(student -> new StudentSourceInfoDTO(
                         student.getSourceDetailId(),
                         student.getStudentId(),
                         student.getStudentSourceCodePath()))

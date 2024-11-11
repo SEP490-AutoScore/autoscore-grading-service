@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
-import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoHaveScoreDTO;
 import com.CodeEvalCrew.AutoScore.services.autoscore_postman_service.IAutoscorePostmanService;
 import com.CodeEvalCrew.AutoScore.services.check_important.ICheckImportant;
 import com.CodeEvalCrew.AutoScore.services.plagiarism_check_service.IPlagiarismDetectionService;
@@ -38,9 +37,8 @@ public class GradingController {
         try {
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
             System.out.println("hello:: " + listSourceInfoDTOs);
-            List<StudentSourceInfoHaveScoreDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService
-                    .gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy());
-            plagiarismDetectionService.runPlagiarismDetection(listSourceInfoDTOs, request.getExamType(),
+            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy());
+            plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(),
                     request.getOrganizationId());
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
