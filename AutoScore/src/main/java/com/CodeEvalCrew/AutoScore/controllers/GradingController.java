@@ -37,7 +37,7 @@ public class GradingController {
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
-            System.out.println("hello: " + listSourceInfoDTOs);
+            System.out.println("hello:: " + listSourceInfoDTOs);
             List<StudentSourceInfoHaveScoreDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService
                     .gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy());
             plagiarismDetectionService.runPlagiarismDetection(listSourceInfoDTOs, request.getExamType(),
