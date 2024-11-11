@@ -1,5 +1,7 @@
 package com.CodeEvalCrew.AutoScore.repositories.score_repository;
 
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,4 +16,5 @@ public interface ScoreRepository extends JpaRepository<Score, Long> {
     Student findStudentById(@Param("studentId") Long studentId);
 
     Score findByStudentStudentId(Long studentId);
+    List<Score> findByExamPaperExamPaperId(Long examPaperId);
 }

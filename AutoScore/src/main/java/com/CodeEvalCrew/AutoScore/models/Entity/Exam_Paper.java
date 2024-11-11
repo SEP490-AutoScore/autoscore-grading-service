@@ -64,4 +64,7 @@ public class Exam_Paper {
 
     @OneToMany(mappedBy = "examPaper", cascade= CascadeType.ALL)
     private Set<Important_Exam_Paper> importants;
+
+    @OneToMany(mappedBy = "examPaper", cascade = CascadeType.ALL)
+    private Set<Postman_For_Grading> postmanForGradings;
 }

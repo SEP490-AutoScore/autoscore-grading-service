@@ -23,13 +23,11 @@ public class ImportantCheckController {
     public ResponseEntity<?> checkImportant(@RequestBody CheckImportantRequest request) {
         try {
             var result = checkImportant.checkImportantForGranding(request);
-            
             return new ResponseEntity<>(result, HttpStatus.OK);
-        } catch (NotFoundException e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch(NotFoundException e){
+            return new ResponseEntity<>(e.getMessage() ,HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch(Exception e){
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
-}
+ }
