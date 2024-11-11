@@ -33,10 +33,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Service
 public class SourceCheckUtil implements ISourceCheckUtil{
     private static final String SECTION_STRING = "ConnectionStrings";
-    private static final String NODE_DATABASE_STRING = "MyDB";
+    private static final String NODE_DATABASE_STRING = "DefaultConnection";
     private static final String APPSETTING_NAME = "appsettings.json";
     private static final int REQUIRE_PROJ = 2;
 
+    @Override
     public List<StudentSourceInfoDTO> getImportantToCheck(List<Important> importants, List<StudentSource> students, Exam_Paper examPaper) throws Exception, NotFoundException {
         List<StudentSourceInfoDTO> result = new ArrayList<>();
         for (StudentSource student : students) {
@@ -97,7 +98,7 @@ public class SourceCheckUtil implements ISourceCheckUtil{
         if (jsonPath.isEmpty()) {
             throw new NotFoundException(fileName + " not found");
         }
-        boolean flag = analyzeAppSettings(jsonPath.toString(), section, dbNode);
+        boolean flag = analyzeAppSettings(jsonPath.get(), section, dbNode);
         if (flag) {
             return Optional.of("PASS");  
         }
@@ -221,12 +222,12 @@ public class SourceCheckUtil implements ISourceCheckUtil{
             if (rootNode.has(sectionName)) {
                 System.out.println(sectionName + " section found.");
                 JsonNode sectionNode = rootNode.get(sectionName);
+                result = true;
 
                 // Check if the ConnectionStrings section has a DefaultConnection node
                 if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
                     System.out.println(dbNode + " found in " + sectionName + ".");
                     displaySection(sectionNode, sectionName);
-                    result = true;
                 } else if (sectionName.equals(sectionName)) {
                     System.out.println("No " + dbNode + " found in " + sectionName + ".");
                 }
@@ -244,7 +245,6 @@ public class SourceCheckUtil implements ISourceCheckUtil{
             
         } catch (IOException e) {
             System.err.println("Error reading or parsing file: " + filePath);
-            e.printStackTrace();
         }
         return result;
     }

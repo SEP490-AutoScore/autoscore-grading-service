@@ -14,4 +14,7 @@ import lombok.Setter;
 public class CheckImportantRequest {
     private List<StudentForGrading> listStudent;
     private Long examPaperId;
+    private String examType;
+    private Long organizationId;
+    private int numberDeploy;
 }
