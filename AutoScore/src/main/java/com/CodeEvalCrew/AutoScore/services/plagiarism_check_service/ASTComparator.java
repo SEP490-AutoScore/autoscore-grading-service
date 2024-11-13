@@ -4,126 +4,166 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.springframework.stereotype.Service;
 
+import com.CodeEvalCrew.AutoScore.antlr4.CSharpLexer;
+import com.CodeEvalCrew.AutoScore.antlr4.CSharpParser;
+import com.CodeEvalCrew.AutoScore.antlr4.CSharpParser.Add_accessor_declarationContext;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
-import com.github.javaparser.JavaParser;
-import com.github.javaparser.ParseProblemException;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
 
 @Service
 public class ASTComparator {
 
-    List<CompilationUnit> studentASTList = new ArrayList<>();
-
-    public void runPlagiarismDetection(List<Source_Detail> sourceDetails) {
-        this.studentASTList = new ArrayList<>();
-    }
-
+    /**
+     * So sánh mã nguồn của hai sinh viên, chia mã theo từng tầng (Presentation, Business, DataAccess)
+     * để phát hiện sự tương đồng trong từng tầng.
+     */
     @SuppressWarnings("CallToPrintStackTrace")
-    void createASTMatrix(List<Source_Detail> sourceDetails) {
-        studentASTList.clear();
-        System.out.println("Start creating ASTs for all students.");
+    public List<String> compareLayers(Source_Detail detail1, Source_Detail detail2) {
+        List<String> similarSections = new ArrayList<>();
 
-        for (Source_Detail detail : sourceDetails) {
+        // So sánh từng tầng
+        for (String layer : List.of("Presentation", "Business", "DataAccess", "DAO", "DTO", "Service")) {
+            System.out.println("Comparing layer: " + layer);
+
             try {
-                CompilationUnit ast = parseFolderToAST(detail.getStudentSourceCodePath());
-                if (ast != null) {
-                    studentASTList.add(ast);
+                ParseTree ast1 = parseLayerToAST(detail1.getStudentSourceCodePath(), layer);
+                ParseTree ast2 = parseLayerToAST(detail2.getStudentSourceCodePath(), layer);
+
+                if (ast1 != null && ast2 != null) {
+                    extractSimilarNodes(ast1, ast2, similarSections);
                 }
-            } catch (ParseProblemException | IOException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        System.out.println("Complete AST generation for all students.");
-    }
 
-    // Hàm lấy các đoạn mã giống nhau
-    @SuppressWarnings({"CallToPrintStackTrace", "UseSpecificCatch"})
-    List<String> extractSimilarSections(Source_Detail detail1, Source_Detail detail2) {
-        List<String> similarSections = new ArrayList<>();
-        System.out.println("Extracting similar sections between student " + detail1.getStudent().getStudentId()
-                + " and student " + detail2.getStudent().getStudentId());
-
-        try {
-            CompilationUnit ast1 = parseFolderToAST(detail1.getStudentSourceCodePath());
-            CompilationUnit ast2 = parseFolderToAST(detail2.getStudentSourceCodePath());
-
-            // Kiểm tra nếu cả hai AST đều không rỗng
-            if (ast1 != null && ast2 != null) {
-                System.out.println("Number of methods in ast1: " + ast1.findAll(MethodDeclaration.class).size());
-                System.out.println("Number of methods in ast2: " + ast2.findAll(MethodDeclaration.class).size());
-
-                // So sánh các phương thức
-                ast1.findAll(MethodDeclaration.class).forEach(method1 -> {
-                    ast2.findAll(MethodDeclaration.class).forEach(method2 -> {
-                        if (method1.getBody().isPresent() && method2.getBody().isPresent()) {
-                            String methodBody1 = method1.getBody().get().toString();
-                            String methodBody2 = method2.getBody().get().toString();
-
-                            // Kiểm tra độ tương đồng với ngưỡng 80%
-                            if (isMethodSimilar(methodBody1, methodBody2, 0.8)) {
-                                similarSections.add("Similar method found: " + method1.getNameAsString());
-                            }
-                        }
-                    });
-                });
-
-                // So sánh các lớp
-                ast1.findAll(ClassOrInterfaceDeclaration.class).forEach(class1 -> {
-                    ast2.findAll(ClassOrInterfaceDeclaration.class).forEach(class2 -> {
-                        Set<String> members1 = class1.getMembers().stream().map(Object::toString).collect(Collectors.toSet());
-                        Set<String> members2 = class2.getMembers().stream().map(Object::toString).collect(Collectors.toSet());
-
-                        // Kiểm tra nếu có thành viên giống nhau
-                        if (!Collections.disjoint(members1, members2)) {
-                            similarSections.add("Similar class found: " + class1.getNameAsString());
-                        }
-                    });
-                });
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        System.out.println("Extracted " + similarSections.size() + " similar sections.");
+        System.out.println("Total similar sections found: " + similarSections.size());
         return similarSections;
     }
 
-    // Hàm phụ để kiểm tra mức độ tương đồng giữa hai phương thức
-    private boolean isMethodSimilar(String methodBody1, String methodBody2, double threshold) {
-        int distance = LevenshteinDistance.getDefaultInstance().apply(methodBody1, methodBody2);
-        int maxLength = Math.max(methodBody1.length(), methodBody2.length());
-        double similarity = 1 - (double) distance / maxLength;
-        return similarity >= threshold;
-    }
-
+    /**
+     * Phân tích mã nguồn trong thư mục để tạo AST cho tầng cụ thể (layer).
+     */
     @SuppressWarnings("CallToPrintStackTrace")
-    private CompilationUnit parseFolderToAST(String folderPath) throws IOException {
+    private ParseTree parseLayerToAST(String folderPath, String layer) throws IOException {
         StringBuilder combinedCode = new StringBuilder();
 
         Files.walk(Paths.get(folderPath))
                 .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".cs")) // Chỉ đọc các tệp .cs
+                .filter(path -> path.toString().endsWith(".cs"))
+                .forEach(path -> {
+                    // Chỉ đọc các tệp mã nguồn thuộc tầng hiện tại
+                    if (path.toString().contains(layer)) {
+                        try {
+                            String fileContent = new String(Files.readAllBytes(path));
+                            combinedCode.append(fileContent).append("\n");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+
+        CSharpLexer lexer = new CSharpLexer(CharStreams.fromString(combinedCode.toString()));
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        CSharpParser parser = new CSharpParser(tokens);
+
+        return parser.compilation_unit(); // Trả về ParseTree từ parser
+    }
+
+    /**
+     * So sánh các node trong hai AST và lưu các đoạn mã tương tự vào danh sách.
+     */
+    private void extractSimilarNodes(ParseTree studentNode, ParseTree dbNode, List<String> similarSections) {
+        // Điều kiện dừng nếu node hiện tại không trùng khớp
+        if (studentNode == null || dbNode == null) return;
+
+        // So sánh node hiện tại
+        if (studentNode.getText().equals(dbNode.getText())) {
+            similarSections.add(studentNode.getText());
+        }
+
+        // Đệ quy để kiểm tra các con của node
+        for (int i = 0; i < Math.min(studentNode.getChildCount(), dbNode.getChildCount()); i++) {
+            extractSimilarNodes(studentNode.getChild(i), dbNode.getChild(i), similarSections);
+        }
+    }
+
+    /**
+     * Đếm tổng số node trong một AST để phục vụ tính toán tỷ lệ tương đồng.
+     */
+    @SuppressWarnings("CallToPrintStackTrace")
+    public int getTotalNodes(Source_Detail sourceDetail) {
+        try {
+            ParseTree ast = parseFolderToAST(sourceDetail.getStudentSourceCodePath());
+            return countNodes(ast);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    /**
+     * Đếm số node trong AST.
+     */
+    private int countNodes(ParseTree tree) {
+        if (tree == null) return 0;
+        int count = 1; // Đếm node hiện tại
+        for (int i = 0; i < tree.getChildCount(); i++) {
+            count += countNodes(tree.getChild(i));
+        }
+        return count;
+    }
+
+    /**
+     * Hàm phụ để phân tích cú pháp mã nguồn từ thư mục, không phân chia theo tầng.
+     */
+    @SuppressWarnings("CallToPrintStackTrace")
+    private ParseTree parseFolderToAST(String folderPath) throws IOException {
+        StringBuilder combinedCode = new StringBuilder();
+
+        Files.walk(Paths.get(folderPath))
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".cs"))
                 .forEach(path -> {
                     try {
                         String fileContent = new String(Files.readAllBytes(path));
-                        // System.out.println("Content of file " + path + ":\n" + fileContent); // In nội dung tệp
                         combinedCode.append(fileContent).append("\n");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
 
-        // System.out.println("Combined code:\n" + combinedCode); // Kiểm tra nội dung kết hợp
+        CSharpLexer lexer = new CSharpLexer(CharStreams.fromString(combinedCode.toString()));
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        CSharpParser parser = new CSharpParser(tokens);
 
-        return new JavaParser().parse(combinedCode.toString()).getResult().orElse(null);
+        return parser.compilation_unit();
+    }
+
+    /**
+     * Lấy các node cụ thể trong AST như tên lớp, tên hàm, hoặc khai báo biến để so sánh chi tiết hơn.
+     */
+    private void extractSpecificNodes(ParseTree node, List<String> sections, String type) {
+        if (node == null) return;
+
+        // Lọc node theo loại (class, method, variable)
+        if (type.equals("class") && node instanceof CSharpParser.Class_definitionContext) {
+            sections.add(node.getText());
+        } else if (type.equals("method") && node instanceof CSharpParser.Method_declarationContext) {
+            sections.add(node.getText());
+        } else if (type.equals("variable") && node instanceof Add_accessor_declarationContext) {
+            sections.add(node.getText());
+        }
+
+        // Đệ quy duyệt các node con
+        for (int i = 0; i < node.getChildCount(); i++) {
+            extractSpecificNodes(node.getChild(i), sections, type);
+        }
     }
 }

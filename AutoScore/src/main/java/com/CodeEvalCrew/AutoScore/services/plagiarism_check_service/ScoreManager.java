@@ -24,7 +24,7 @@ public class ScoreManager {
 
     // Hàm cập nhật đánh giá đạo văn và lưu trạng thái đạo văn
     @Transactional
-    boolean saveScoreRecord(Source_Detail detail, String isSuspicious, List<CodePlagiarismResult> codePlagiarismResults, double plagiarismPercentage) {
+    boolean saveScoreRecord(Source_Detail detail, String isSuspicious, List<CodePlagiarismResult> codePlagiarismResults) {
         Score score = scoreRepository.findByStudentStudentId(detail.getStudent().getStudentId());
         if (score == null) {
             score = new Score();
@@ -32,40 +32,11 @@ public class ScoreManager {
         }
 
         if (isSuspicious != null) {
-            // Dùng StringBuilder để lưu tất cả sinh viên bị nghi ngờ có mã đạo văn
-            // StringBuilder studentCodePlagiarism = new StringBuilder();
-            // if (score.getCodePlagiarisms() != null) {
-            //     for (Code_Plagiarism codePlagiarism : score.getCodePlagiarisms()) {
-            //         if (codePlagiarism.getStudentCodePlagiarism() != null) {
-            //             studentCodePlagiarism.append(codePlagiarism.getStudentCodePlagiarism()).append(", ");
-            //         }
-            //     }
-            // }
-
-            // Thêm tất cả sinh viên từ codePlagiarismResults
-            // for (CodePlagiarismResult result : codePlagiarismResults) {
-            //     String plagiarizedStudentCode = result.getStudentCodePlagiarism();
-            //     if (plagiarizedStudentCode != null && !studentCodePlagiarism.toString().contains(plagiarizedStudentCode)) {
-            //         studentCodePlagiarism.append(plagiarizedStudentCode).append(", ");
-            //     }
-            // }
-
-            // // Loại bỏ dấu phẩy cuối cùng và thêm dấu chấm
-            // if (studentCodePlagiarism.length() > 0) {
-            //     studentCodePlagiarism.setLength(studentCodePlagiarism.length() - 2); // Xóa dấu phẩy cuối
-            //     studentCodePlagiarism.append("."); // Thêm dấu chấm
-            // }
-
-            // String plagiarismWithStudents = studentCodePlagiarism.toString();
-
-            int plagiarismWithStudents = codePlagiarismResults.size();
-
             // Thiết lập lý do đạo văn và mức độ đạo văn
-            score.setPlagiarismReason("Plagiarism percentage: " + String.format("%.2f", plagiarismPercentage)
-                    + "% with " + plagiarismWithStudents + " students." );
+            score.setPlagiarismReason("Same with " + codePlagiarismResults.size() + " students." );
             score.setLevelOfPlagiarism(isSuspicious);
         } else if (!checkPlagiarismExist(detail.getStudent().getStudentId())) {
-            score.setLevelOfPlagiarism("No plagiarism");
+            score.setLevelOfPlagiarism("NORMAL");
             score.setPlagiarismReason("N/A");
         }
 
@@ -83,6 +54,8 @@ public class ScoreManager {
             codePlagiarism.setSelfCode(result.getSelfCode());
             codePlagiarism.setStudentCodePlagiarism(result.getStudentCodePlagiarism());
             codePlagiarism.setStudentPlagiarism(result.getStudentPlagiarism());
+            codePlagiarism.setPlagiarismPercentage(String.format("%.2f", result.getPlagiarismPercentage()) + "%");
+            codePlagiarism.setType(result.getType());
             codePlagiarismRepository.save(codePlagiarism);
         }
 

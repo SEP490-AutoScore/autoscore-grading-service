@@ -35,7 +35,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -197,12 +196,11 @@
             <artifactId>commons-text</artifactId>
             <version>1.12.0</version>
         </dependency>
-        <!-- <dependency> 
+        <dependency> 
             <groupId>org.antlr</groupId> 
             <artifactId>antlr4</artifactId> 
             <version>4.13.2</version> 
-        </dependency>  -->
-
+        </dependency>
     </dependencies>
     
     <build>
@@ -244,10 +242,18 @@
                 </configuration>
             </plugin>
             <!-- Check plagiarism -->
-            <!-- <plugin>
+            <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>
                 <version>4.13.2</version>
+                <configuration>
+                    <sourceDirectory>${project.basedir}/src/main/antlr4</sourceDirectory>
+                    <outputDirectory>${project.basedir}/src/main/java/com/CodeEvalCrew/AutoScore/antlr4</outputDirectory>
+                    <arguments>
+                        <argument>-package</argument>
+                        <argument>com.CodeEvalCrew.AutoScore.antlr4</argument>
+                    </arguments>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -255,7 +261,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin> -->
+            </plugin>
         </plugins>
     </build>
     
