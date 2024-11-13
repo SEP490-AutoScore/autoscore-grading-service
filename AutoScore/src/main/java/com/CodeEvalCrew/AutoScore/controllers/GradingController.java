@@ -43,7 +43,7 @@ public class GradingController {
             System.out.println("--------- Check Important ---------");
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
             System.out.println("--------- Grading ---------");
-            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy());
+            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy(),request.getMemory_Megabyte(), request.getProcessors());
             System.out.println("--------- Plagiarism Detection ---------");
             plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId());
             System.out.println("--------- Add Student Error To Score ---------");
