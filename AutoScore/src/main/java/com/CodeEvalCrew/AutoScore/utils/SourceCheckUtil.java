@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -18,6 +19,7 @@ import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -27,47 +29,87 @@ import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Important;
+import com.CodeEvalCrew.AutoScore.models.Entity.Score;
+import com.CodeEvalCrew.AutoScore.models.Entity.Student;
+import com.CodeEvalCrew.AutoScore.repositories.score_repository.ScoreRepository;
+import com.CodeEvalCrew.AutoScore.repositories.student_repository.StudentRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
-public class SourceCheckUtil implements ISourceCheckUtil{
+public class SourceCheckUtil implements ISourceCheckUtil {
+
     private static final String SECTION_STRING = "ConnectionStrings";
-    private static final String NODE_DATABASE_STRING = "MyDB";
+    private static final String NODE_DATABASE_STRING = "DefaultConnection";
     private static final String APPSETTING_NAME = "appsettings.json";
     private static final int REQUIRE_PROJ = 2;
 
+    @Autowired
+    private ScoreRepository scoreRepository;
+    @Autowired
+    private StudentRepository studentRepository;
+
+    @Override
     public List<StudentSourceInfoDTO> getImportantToCheck(List<Important> importants, List<StudentSource> students, Exam_Paper examPaper) throws Exception, NotFoundException {
         List<StudentSourceInfoDTO> result = new ArrayList<>();
         for (StudentSource student : students) {
             boolean isPass = true;
+            String error = "";
             for (Important important : importants) {
+                
                 switch (important.getImportantCode()) {
                     case "SLN" -> {
                         String solutionName = examPaper.getExam().getExamCode() + "_" + examPaper.getExamPaperCode() + "_" + student.getStudent().getStudentCode();
                         Optional<String> SLNFlag = checkSolutionName(solutionName, student.getSourceDetail().getStudentSourceCodePath());
                         if (SLNFlag == null) {
                             isPass = false;
+                            error += String.format("Solution with %s not found;", solutionName);
                         }
                     }
                     case "CNS" -> {
                         Optional<String> CNTFlag = checkConnectionStrings(student.getSourceDetail().getStudentSourceCodePath(), SECTION_STRING, NODE_DATABASE_STRING, APPSETTING_NAME);
                         if (CNTFlag == null) {
                             isPass = false;
+                            error += "Connection String not found;";
                         }
                     }
                     case "SST" -> {
                         Optional<String> SSTFlag = checkSourceStructure(student.getSourceDetail().getStudentSourceCodePath(), REQUIRE_PROJ);
                         if (SSTFlag == null) {
                             isPass = false;
+                            error += "Source structure not valid;";
                         }
                     }
                     default ->
-                        throw new AssertionError();
+                        throw new Exception("Important not found");
                 }
             }
+
             if (isPass) {
                 result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+            } else {
+                Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudent().getStudentId(), examPaper.getExamPaperId());
+                if (score == null) {
+                    score = new Score();
+                    Student stu = studentRepository.findById(student.getStudent().getStudentId()).get();
+                    if (stu == null) {
+                        
+                    }
+                    score.setStudent(stu);
+
+                    Exam_Paper examPaperToSave = new Exam_Paper();
+                    examPaperToSave.setExamPaperId(examPaper.getExamPaperId());
+                    score.setExamPaper(examPaper);
+                    score.setTotalScore(0.0f);
+                    score.setGradedAt(LocalDateTime.now());
+                    score.setReason(error);
+                    scoreRepository.save(score);
+                    error = "";
+                } else {
+                    score.setReason(error);
+                    scoreRepository.save(score);
+                    error = "";
+                }
             }
         }
         return result;
@@ -99,7 +141,7 @@ public class SourceCheckUtil implements ISourceCheckUtil{
         }
         boolean flag = analyzeAppSettings(jsonPath.get(), section, dbNode);
         if (flag) {
-            return Optional.of("PASS");  
+            return Optional.of("PASS");
         }
         return null;
     }
@@ -221,15 +263,14 @@ public class SourceCheckUtil implements ISourceCheckUtil{
             if (rootNode.has(sectionName)) {
                 System.out.println(sectionName + " section found.");
                 JsonNode sectionNode = rootNode.get(sectionName);
-
-                // Check if the ConnectionStrings section has a DefaultConnection node
-                if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
-                    System.out.println(dbNode + " found in " + sectionName + ".");
-                    displaySection(sectionNode, sectionName);
-                    result = true;
-                } else if (sectionName.equals(sectionName)) {
-                    System.out.println("No " + dbNode + " found in " + sectionName + ".");
-                }
+                result = true;
+                // // Check if the ConnectionStrings section has a DefaultConnection node
+                // if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
+                //     System.out.println(dbNode + " found in " + sectionName + ".");
+                //     displaySection(sectionNode, sectionName);
+                // } else if (sectionName.equals(sectionName)) {
+                //     System.out.println("No " + dbNode + " found in " + sectionName + ".");
+                // }
             } else {
                 System.out.println("No " + sectionName + " section found.");
             }
@@ -241,7 +282,7 @@ public class SourceCheckUtil implements ISourceCheckUtil{
             while (rootKeys.hasNext()) {
                 System.out.println(" - " + rootKeys.next());
             }
-            
+
         } catch (IOException e) {
             System.err.println("Error reading or parsing file: " + filePath);
         }
@@ -322,20 +363,20 @@ public class SourceCheckUtil implements ISourceCheckUtil{
     }
 
     //main check
-    public static void main(String[] args) throws IOException {
-        String projectPath = "C:\\Project\\PE_PRN231_SU24_009909\\StudentSolution\\1\\vuongvtse160599\\0\\PEPRN231_SU24_009909_VoTrongVuong_BE";  // Replace with the path to your project directory
-        List<File> csprojFiles = collectCsprojFiles(new File(projectPath));
-        if (csprojFiles.isEmpty()) {
-            System.out.println("No .csproj files found.");
-        } else {
-            System.out.println(csprojFiles.size() + " .csproj files found:");
-            // csprojFiles.forEach(file -> System.out.println(file.getAbsolutePath()));
-        }
-        File mainProject = findMainProject(csprojFiles);
+    // public static void main(String[] args) throws IOException {
+    //     String projectPath = "C:\\Project\\PE_PRN231_SU24_009909\\StudentSolution\\1\\vuongvtse160599\\0\\PEPRN231_SU24_009909_VoTrongVuong_BE";  // Replace with the path to your project directory
+    //     List<File> csprojFiles = collectCsprojFiles(new File(projectPath));
+    //     if (csprojFiles.isEmpty()) {
+    //         System.out.println("No .csproj files found.");
+    //     } else {
+    //         System.out.println(csprojFiles.size() + " .csproj files found:");
+    //         // csprojFiles.forEach(file -> System.out.println(file.getAbsolutePath()));
+    //     }
+    //     File mainProject = findMainProject(csprojFiles);
 
-        boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
-        System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
-    }
+    //     boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
+    //     System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
+    // }
 
     static boolean checkAllProjectsReferenced(List<File> csprojFiles, File mainProject) {
         Map<String, List<String>> projectReferences = new HashMap<>();
