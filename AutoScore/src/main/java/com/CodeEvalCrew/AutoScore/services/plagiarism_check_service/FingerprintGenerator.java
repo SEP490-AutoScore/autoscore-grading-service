@@ -13,8 +13,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class FingerprintGenerator {
+
     private static final int SEGMENT_LENGTH = 50;  // Độ dài mỗi đoạn
-    private static final int THRESHOLD_LOW = 40;
+    private static final int THRESHOLD_LOW = 50;
     private static final int THRESHOLD_HIGH = 70;
     // Cơ sở dữ liệu vân tay, lưu dấu vân tay dưới dạng Map với khóa là đoạn mã và giá trị là danh sách các bản ghi sinh viên
     private final Map<String, List<FingerprintRecord>> fingerprintDatabase = new HashMap<>();
@@ -94,9 +95,9 @@ public class FingerprintGenerator {
         double matchPercentage = (double) matchCount / totalSegments * 100;
         String isSuspicious = null;
         if (matchPercentage >= THRESHOLD_LOW && matchPercentage < THRESHOLD_HIGH) {
-            isSuspicious = "Definitely Plagiarized";
+            isSuspicious = "DEFINITELY";
         } else if (matchPercentage >= THRESHOLD_HIGH) {
-            isSuspicious = "Possibly Plagiarized";
+            isSuspicious = "POSSIBLY";
         }
 
         // Xác định sinh viên khác (nếu có) khi phát hiện đạo văn

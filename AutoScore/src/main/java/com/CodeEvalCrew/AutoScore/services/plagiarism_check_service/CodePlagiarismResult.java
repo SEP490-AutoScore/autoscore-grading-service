@@ -14,4 +14,6 @@ public class CodePlagiarismResult {
     private String studentCodePlagiarism;
     @Lob
     private String studentPlagiarism;
+    private double plagiarismPercentage;
+    private String type;
 }
