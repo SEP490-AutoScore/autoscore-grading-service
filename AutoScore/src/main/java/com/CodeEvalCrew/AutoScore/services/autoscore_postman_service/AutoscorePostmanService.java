@@ -401,6 +401,9 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             return;
         }
 
+        // Sử dụng StringBuilder để lưu lý do
+        StringBuilder reasonBuilder = new StringBuilder();
+
         Score score = new Score();
         score.setStudent(student);
         score.setExamPaper(examPaper);
@@ -435,12 +438,17 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             Long noPmtestAchieve = functionPassedCountMap.getOrDefault(postmanFunction.getPostmanFunctionName(), 0L);
             System.out.println("noPmtestAchieve for function " + postmanFunction.getPostmanFunctionName() + ": "
                     + noPmtestAchieve);
+            reasonBuilder.append("noPmtestAchieve for function ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(": ")
+                    .append(noPmtestAchieve)
+                    .append("\n");
 
             scoreDetail.setNoPmtestAchieve(noPmtestAchieve);
 
             // Tính scoreAchieve
             Float scoreAchieve = calculateScoreAchieve(postmanFunction, noPmtestAchieve, functionPassedCountMap,
-                    parentScoreMap);
+                    parentScoreMap, reasonBuilder);
             scoreDetail.setScoreAchieve(scoreAchieve);
 
             // Cộng dồn scoreAchieve vào totalScoreAchieve
@@ -452,22 +460,33 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 parentScoreMap.put(postmanFunction.getPostmanForGradingId(), scoreAchieve);
                 System.out.println("Updated parentScoreMap for function " + postmanFunction.getPostmanFunctionName()
                         + " with scoreAchieve: " + scoreAchieve);
+                reasonBuilder.append("Updated parentScoreMap for function ")
+                        .append(postmanFunction.getPostmanFunctionName())
+                        .append(" with scoreAchieve: ")
+                        .append(scoreAchieve)
+                        .append("\n");
             }
 
             // Lưu scoreDetail vào database
             scoreDetailRepository.save(scoreDetail);
             System.out.println("Saved score detail for function " + postmanFunction.getPostmanFunctionName()
                     + ", scoreAchieve: " + scoreAchieve);
+            reasonBuilder.append("Saved score detail for function ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(", scoreAchieve: ")
+                    .append(scoreAchieve)
+                    .append("\n");
         }
 
         // Cập nhật lại tổng điểm vào Score
         score.setTotalScore(totalScoreAchieve);
         scoreRepository.save(score); // Lưu lại Score với totalScore đã cập nhật
         System.out.println("Saved total score: " + totalScoreAchieve);
+        reasonBuilder.append("Saved total score: ").append(totalScoreAchieve).append("\n");
     }
 
     private Float calculateScoreAchieve(Postman_For_Grading postmanFunction, Long noPmtestAchieve,
-            Map<String, Long> functionPassedCountMap, Map<Long, Float> parentScoreMap) {
+            Map<String, Long> functionPassedCountMap, Map<Long, Float> parentScoreMap, StringBuilder reasonBuilder) {
         Long totalPmtest = postmanFunction.getTotalPmTest();
         Float scoreOfFunction = postmanFunction.getScoreOfFunction();
         Long parentId = postmanFunction.getPostmanForGradingParentId();
@@ -480,6 +499,15 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                     ", noPmtestAchieve: " + noPmtestAchieve +
                     ", totalPmtest: " + totalPmtest +
                     ", scoreAchieve: " + scoreAchieve);
+            reasonBuilder.append("Calculating score for parent function: ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(", noPmtestAchieve: ")
+                    .append(noPmtestAchieve)
+                    .append(", totalPmtest: ")
+                    .append(totalPmtest)
+                    .append(", scoreAchieve: ")
+                    .append(scoreAchieve)
+                    .append("\n");
             return scoreAchieve;
         }
         // Nếu là chức năng con và chức năng cha có scoreAchieve = 0
@@ -489,6 +517,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             System.out.println("Parent function '" + parentFunctionName + "' has scoreAchieve = 0, so child function '"
                     + postmanFunction.getPostmanFunctionName() + "' will also have scoreAchieve = 0");
+            reasonBuilder.append("Parent function '").append(parentFunctionName)
+                    .append("' has scoreAchieve = 0, so child function '")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append("' will also have scoreAchieve = 0\n");
             return 0.0f;
         }
         // Trường hợp khác
@@ -497,6 +529,15 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 ", noPmtestAchieve: " + noPmtestAchieve +
                 ", totalPmtest: " + totalPmtest +
                 ", scoreAchieve: " + scoreAchieve);
+        reasonBuilder.append("Calculating score for child function: ")
+                .append(postmanFunction.getPostmanFunctionName())
+                .append(", noPmtestAchieve: ")
+                .append(noPmtestAchieve)
+                .append(", totalPmtest: ")
+                .append(totalPmtest)
+                .append(", scoreAchieve: ")
+                .append(scoreAchieve)
+                .append("\n");
         return scoreAchieve;
     }
 
