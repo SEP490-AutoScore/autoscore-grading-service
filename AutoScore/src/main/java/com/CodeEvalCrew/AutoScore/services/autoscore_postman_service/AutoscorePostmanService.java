@@ -2,6 +2,8 @@ package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -83,6 +85,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private static final String NEWMAN_CMD_PATH = "C:\\Users\\nhatt\\AppData\\Roaming\\npm\\newman.cmd";
     private static final int BASE_PORT = 10000;
     String directoryPath = "C:\\Project\\AutoScore\\Grading";
+    private static final String CONFIG_MEMORY_PROCESSOR = "C:\\Users\\Admin\\.wslconfig";
 
     @Autowired
     private SourceRepository sourceRepository;
@@ -107,7 +110,35 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
-            Long examPaperId, int numberDeploy) {
+            Long examPaperId, int numberDeploy, Long memory_Megabyte, Long processors) {
+
+        // Config memory and processor for deploying docker
+        try {
+            File configFile = new File(CONFIG_MEMORY_PROCESSOR);
+
+            // Check conditions for memory_Megabyte and processors
+            if (memory_Megabyte == 0 || processors == 0) {
+                // Delete the .wslconfig file if it exists
+                if (configFile.exists()) {
+                    Files.delete(Path.of(CONFIG_MEMORY_PROCESSOR));
+                    System.out.println(".wslconfig file deleted due to zero memory or processors request.");
+                }
+            } else {
+                // Delete the .wslconfig file if it exists and create a new one
+                if (configFile.exists()) {
+                    Files.delete(Path.of(CONFIG_MEMORY_PROCESSOR));
+                }
+
+                try (FileWriter writer = new FileWriter(CONFIG_MEMORY_PROCESSOR)) {
+                    writer.write("[wsl2]\n");
+                    writer.write("memory=" + memory_Megabyte + "MB\n");
+                    writer.write("processors=" + processors + "\n");
+                    System.out.println(".wslconfig file created with new configuration.");
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error managing .wslconfig file: " + e.getMessage());
+        }
 
         // Chạy Postman Collection và lấy kết quả
         String postmanResult = runPostmanCollection(examPaperId);
