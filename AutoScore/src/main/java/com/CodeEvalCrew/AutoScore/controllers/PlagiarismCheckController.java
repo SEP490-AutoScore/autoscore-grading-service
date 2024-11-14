@@ -21,9 +21,9 @@ public class PlagiarismCheckController {
 
     @PostMapping("/runPlagiarismDetection")
     public void runPlagiarismDetection(@RequestBody List<StudentSourceInfoDTO> sourceDetails, 
-    @RequestParam("exam_type") String examType, @RequestParam("organization_id") Long organizationId) {
+    @RequestParam("exam_type") String examType, @RequestParam("organization_id") Long organizationId, @RequestParam("exam_paper_id") Long examPaperId) {
         try {
-            plagiarismDetectionService.runPlagiarismDetection(sourceDetails, examType, organizationId);
+            plagiarismDetectionService.runPlagiarismDetection(sourceDetails, examType, organizationId, examPaperId);
         }
         catch (Exception e) {
             e.printStackTrace();

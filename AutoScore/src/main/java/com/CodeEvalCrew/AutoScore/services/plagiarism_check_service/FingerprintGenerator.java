@@ -15,8 +15,8 @@ import org.springframework.stereotype.Service;
 public class FingerprintGenerator {
 
     private static final int SEGMENT_LENGTH = 50;  // Độ dài mỗi đoạn
-    private static final int THRESHOLD_LOW = 50;
-    private static final int THRESHOLD_HIGH = 70;
+    private static final int THRESHOLD_LOW = 40;
+    private static final int THRESHOLD_HIGH = 60;
     // Cơ sở dữ liệu vân tay, lưu dấu vân tay dưới dạng Map với khóa là đoạn mã và giá trị là danh sách các bản ghi sinh viên
     private final Map<String, List<FingerprintRecord>> fingerprintDatabase = new HashMap<>();
 

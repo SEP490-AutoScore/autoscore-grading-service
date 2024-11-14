@@ -7,5 +7,4 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Code_Plagiarism;
 
 @Repository
 public interface CodePlagiarismRepository extends JpaRepository<Code_Plagiarism, Long> {
-    
 }
