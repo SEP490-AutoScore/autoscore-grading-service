@@ -185,12 +185,12 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         return studentsWithScores;
     }
 
-    public void processStudentSolutions(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int batchSize) {
-        int totalBatches = (int) Math.ceil((double) studentSources.size() / batchSize);
+    public void processStudentSolutions(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int numberDeploy) {
+        int totalBatches = (int) Math.ceil((double) studentSources.size() / numberDeploy);
 
         for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-            int start = batchIndex * batchSize;
-            int end = Math.min(start + batchSize, studentSources.size());
+            int start = batchIndex * numberDeploy;
+            int end = Math.min(start + numberDeploy, studentSources.size());
             List<StudentSourceInfoDTO> currentBatch = studentSources.subList(start, end);
 
             ExecutorService executor = Executors.newFixedThreadPool(currentBatch.size());
@@ -401,6 +401,9 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             return;
         }
 
+        // Sử dụng StringBuilder để lưu lý do
+        StringBuilder reasonBuilder = new StringBuilder();
+
         Score score = new Score();
         score.setStudent(student);
         score.setExamPaper(examPaper);
@@ -435,12 +438,17 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             Long noPmtestAchieve = functionPassedCountMap.getOrDefault(postmanFunction.getPostmanFunctionName(), 0L);
             System.out.println("noPmtestAchieve for function " + postmanFunction.getPostmanFunctionName() + ": "
                     + noPmtestAchieve);
+            reasonBuilder.append("noPmtestAchieve for function ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(": ")
+                    .append(noPmtestAchieve)
+                    .append("\n");
 
             scoreDetail.setNoPmtestAchieve(noPmtestAchieve);
 
             // Tính scoreAchieve
             Float scoreAchieve = calculateScoreAchieve(postmanFunction, noPmtestAchieve, functionPassedCountMap,
-                    parentScoreMap);
+                    parentScoreMap, reasonBuilder);
             scoreDetail.setScoreAchieve(scoreAchieve);
 
             // Cộng dồn scoreAchieve vào totalScoreAchieve
@@ -452,22 +460,34 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 parentScoreMap.put(postmanFunction.getPostmanForGradingId(), scoreAchieve);
                 System.out.println("Updated parentScoreMap for function " + postmanFunction.getPostmanFunctionName()
                         + " with scoreAchieve: " + scoreAchieve);
+                reasonBuilder.append("Updated parentScoreMap for function ")
+                        .append(postmanFunction.getPostmanFunctionName())
+                        .append(" with scoreAchieve: ")
+                        .append(scoreAchieve)
+                        .append("\n");
             }
 
             // Lưu scoreDetail vào database
             scoreDetailRepository.save(scoreDetail);
             System.out.println("Saved score detail for function " + postmanFunction.getPostmanFunctionName()
                     + ", scoreAchieve: " + scoreAchieve);
+            reasonBuilder.append("Saved score detail for function ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(", scoreAchieve: ")
+                    .append(scoreAchieve)
+                    .append("\n");
         }
 
         // Cập nhật lại tổng điểm vào Score
         score.setTotalScore(totalScoreAchieve);
         scoreRepository.save(score); // Lưu lại Score với totalScore đã cập nhật
+        score.setReason(reasonBuilder.toString()); // Gán lý do vào trường reason
         System.out.println("Saved total score: " + totalScoreAchieve);
+        reasonBuilder.append("Saved total score: ").append(totalScoreAchieve).append("\n");
     }
 
     private Float calculateScoreAchieve(Postman_For_Grading postmanFunction, Long noPmtestAchieve,
-            Map<String, Long> functionPassedCountMap, Map<Long, Float> parentScoreMap) {
+            Map<String, Long> functionPassedCountMap, Map<Long, Float> parentScoreMap, StringBuilder reasonBuilder) {
         Long totalPmtest = postmanFunction.getTotalPmTest();
         Float scoreOfFunction = postmanFunction.getScoreOfFunction();
         Long parentId = postmanFunction.getPostmanForGradingParentId();
@@ -480,6 +500,15 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                     ", noPmtestAchieve: " + noPmtestAchieve +
                     ", totalPmtest: " + totalPmtest +
                     ", scoreAchieve: " + scoreAchieve);
+            reasonBuilder.append("Calculating score for parent function: ")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append(", noPmtestAchieve: ")
+                    .append(noPmtestAchieve)
+                    .append(", totalPmtest: ")
+                    .append(totalPmtest)
+                    .append(", scoreAchieve: ")
+                    .append(scoreAchieve)
+                    .append("\n");
             return scoreAchieve;
         }
         // Nếu là chức năng con và chức năng cha có scoreAchieve = 0
@@ -489,6 +518,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             System.out.println("Parent function '" + parentFunctionName + "' has scoreAchieve = 0, so child function '"
                     + postmanFunction.getPostmanFunctionName() + "' will also have scoreAchieve = 0");
+            reasonBuilder.append("Parent function '").append(parentFunctionName)
+                    .append("' has scoreAchieve = 0, so child function '")
+                    .append(postmanFunction.getPostmanFunctionName())
+                    .append("' will also have scoreAchieve = 0\n");
             return 0.0f;
         }
         // Trường hợp khác
@@ -497,33 +530,88 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 ", noPmtestAchieve: " + noPmtestAchieve +
                 ", totalPmtest: " + totalPmtest +
                 ", scoreAchieve: " + scoreAchieve);
+        reasonBuilder.append("Calculating score for child function: ")
+                .append(postmanFunction.getPostmanFunctionName())
+                .append(", noPmtestAchieve: ")
+                .append(noPmtestAchieve)
+                .append(", totalPmtest: ")
+                .append(totalPmtest)
+                .append(", scoreAchieve: ")
+                .append(scoreAchieve)
+                .append("\n");
         return scoreAchieve;
     }
 
     private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
         Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
         Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
-
+    
+        // Executor service để quản lý các luồng
+        ExecutorService executor = Executors.newFixedThreadPool(1); // Mỗi tiến trình chạy trong một luồng riêng biệt
+    
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
-            processBuilder.directory(dirPath.toFile());
-            processBuilder.inheritIO();
-
-            Process process = processBuilder.start();
-
-            int exitCode = process.waitFor();
-
-            if (exitCode == 0) {
-                return new StudentDeployResult(studentId, true, "Deploy thành công");
-            } else {
-                return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
-            }
-
-        } catch (IOException | InterruptedException e) {
+            // Gửi công việc vào một luồng riêng biệt để thực thi lệnh docker-compose
+            Future<StudentDeployResult> future = executor.submit(() -> {
+                ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
+                processBuilder.directory(dirPath.toFile());
+    
+                // Cho phép tiến trình con sử dụng đầu ra của terminal
+                processBuilder.inheritIO();
+    
+                try {
+                    // Bắt đầu quá trình docker-compose
+                    Process process = processBuilder.start();
+                    int exitCode = process.waitFor();
+    
+                    if (exitCode == 0) {
+                        return new StudentDeployResult(studentId, true, "Deploy thành công");
+                    } else {
+                        return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
+                    }
+    
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                    return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+                }
+            });
+    
+            // Chờ cho tiến trình hoàn thành và nhận kết quả
+            return future.get(); // Block cho đến khi tiến trình hoàn tất
+    
+        } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+        } finally {
+            // Đảm bảo tắt executor sau khi hoàn thành
+            executor.shutdown();
         }
     }
+
+    
+    // private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
+    //     Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
+    //     Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
+
+    //     try {
+    //         ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
+    //         processBuilder.directory(dirPath.toFile());
+    //         processBuilder.inheritIO();
+
+    //         Process process = processBuilder.start();
+
+    //         int exitCode = process.waitFor();
+
+    //         if (exitCode == 0) {
+    //             return new StudentDeployResult(studentId, true, "Deploy thành công");
+    //         } else {
+    //             return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
+    //         }
+
+    //     } catch (IOException | InterruptedException e) {
+    //         e.printStackTrace();
+    //         return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+    //     }
+    // }
 
     private void recordFailure(Long studentId, Long examPaperId, String reason) {
         Student student = scoreRepository.findStudentById(studentId);
@@ -586,7 +674,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Files.writeString(filePath, content, StandardCharsets.UTF_8);
     }
 
-    public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) throws IOException {
+    public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) {
         try (Stream<Path> folders = Files.walk(dirPath, 1)) {
             List<Path> targetDirs = folders
                     .filter(Files::isDirectory)
@@ -598,6 +686,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                         }
                     })
                     .collect(Collectors.toList());
+    
             for (Path targetDir : targetDirs) {
                 try (Stream<Path> paths = Files.walk(targetDir)) {
                     paths.filter(Files::isRegularFile)
@@ -606,13 +695,47 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                                 try {
                                     updateAppsettingsJson(path, examPaperId, port);
                                 } catch (IOException e) {
+                                    // Log lỗi và tiếp tục thực thi
                                     System.err.println("Error updating: " + path + " - " + e.getMessage());
                                 }
                             });
+                } catch (IOException e) {
+                    System.err.println("Error walking through files in directory: " + targetDir + " - " + e.getMessage());
                 }
             }
+        } catch (IOException e) {
+            System.err.println("Error walking through directories: " + dirPath + " - " + e.getMessage());
         }
     }
+
+
+    // public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) throws IOException {
+    //     try (Stream<Path> folders = Files.walk(dirPath, 1)) {
+    //         List<Path> targetDirs = folders
+    //                 .filter(Files::isDirectory)
+    //                 .filter(path -> {
+    //                     try (Stream<Path> files = Files.walk(path, 1)) {
+    //                         return files.anyMatch(file -> file.getFileName().toString().equalsIgnoreCase("Program.cs"));
+    //                     } catch (IOException e) {
+    //                         return false;
+    //                     }
+    //                 })
+    //                 .collect(Collectors.toList());
+    //         for (Path targetDir : targetDirs) {
+    //             try (Stream<Path> paths = Files.walk(targetDir)) {
+    //                 paths.filter(Files::isRegularFile)
+    //                         .filter(path -> path.toString().endsWith("appsettings.json"))
+    //                         .forEach(path -> {
+    //                             try {
+    //                                 updateAppsettingsJson(path, examPaperId, port);
+    //                             } catch (IOException e) {
+    //                                 System.err.println("Error updating: " + path + " - " + e.getMessage());
+    //                             }
+    //                         });
+    //             }
+    //         }
+    //     }
+    // }
 
     private void deleteAndCreateDatabaseByExamPaperId(Long examPaperId) {
         try {

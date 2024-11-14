@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
-import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.StudentForGrading;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Important;
@@ -74,9 +73,9 @@ public class CheckImportant implements ICheckImportant{
             List<StudentSource> students = new ArrayList<>();
 
             //getListStudent
-            for (StudentForGrading studentForGrading : request.getListStudent()) {
-                Student stu = checkEntityExistence(studentRepository.findById(studentForGrading.getStudentId()), "Student", studentForGrading.getStudentId());
-                Source_Detail source_Detail = getSourceDetailByStudentIdAndExamPaperId(studentForGrading.getStudentId(), request.getExamPaperId());
+            for (Long studentForGrading : request.getListStudent()) {
+                Student stu = checkEntityExistence(studentRepository.findById(studentForGrading), "Student", studentForGrading);
+                Source_Detail source_Detail = getSourceDetailByStudentIdAndExamPaperId(studentForGrading, request.getExamPaperId());
                 students.add(new StudentSource(stu, source_Detail));
             }
 
