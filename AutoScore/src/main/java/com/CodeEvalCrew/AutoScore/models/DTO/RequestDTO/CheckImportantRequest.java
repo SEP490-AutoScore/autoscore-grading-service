@@ -12,7 +12,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CheckImportantRequest {
-    private List<StudentForGrading> listStudent;
+    private List<Long> listStudent;
     private Long examPaperId;
     private String examType;
     private Long organizationId;
