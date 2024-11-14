@@ -27,13 +27,13 @@ public class ScoreManager {
     boolean saveScoreRecord(Source_Detail detail, String isSuspicious, List<CodePlagiarismResult> codePlagiarismResults) {
         Score score = scoreRepository.findByStudentStudentId(detail.getStudent().getStudentId());
         if (score == null) {
-            score = new Score();
-            score.setStudent(detail.getStudent());
+            System.out.println("Saving student error score for student: " + detail.getStudent().getStudentCode());
+            return false;
         }
 
         if (isSuspicious != null) {
             // Thiết lập lý do đạo văn và mức độ đạo văn
-            score.setPlagiarismReason("Same with " + codePlagiarismResults.size() + " students." );
+            score.setPlagiarismReason("Same with " + codePlagiarismResults.size() + " students.");
             score.setLevelOfPlagiarism(isSuspicious);
         } else if (!checkPlagiarismExist(detail.getStudent().getStudentId())) {
             score.setLevelOfPlagiarism("NORMAL");
@@ -49,6 +49,10 @@ public class ScoreManager {
 
     private void saveCodePlagiarism(List<CodePlagiarismResult> codePlagiarismResults, Score score) {
         for (CodePlagiarismResult result : codePlagiarismResults) {
+            if (result.getSelfCode() == null || result.getSelfCode().isEmpty()
+                    || result.getStudentPlagiarism() == null || result.getStudentPlagiarism().isEmpty()) {
+                continue;
+            }
             Code_Plagiarism codePlagiarism = new Code_Plagiarism();
             codePlagiarism.setScore(score);
             codePlagiarism.setSelfCode(result.getSelfCode());
@@ -58,7 +62,6 @@ public class ScoreManager {
             codePlagiarism.setType(result.getType());
             codePlagiarismRepository.save(codePlagiarism);
         }
-
     }
 
     private boolean checkPlagiarismExist(Long studentId) {

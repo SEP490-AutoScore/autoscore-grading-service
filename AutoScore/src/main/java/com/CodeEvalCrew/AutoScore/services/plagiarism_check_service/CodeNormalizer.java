@@ -2,8 +2,8 @@ package com.CodeEvalCrew.AutoScore.services.plagiarism_check_service;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.charset.MalformedInputException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,7 +24,10 @@ public class CodeNormalizer {
             // Duyệt qua tất cả các tệp .cs trong thư mục (bao gồm cả thư mục con)
             Stream<Path> filePaths = Files.walk(Paths.get(folderPath))
                     .filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".cs"));
+                    .filter(path -> path.toString().endsWith(".cs"))
+                    .filter(path -> !path.getFileName().toString().toUpperCase().contains("DBCONTEXT.CS")
+                    && !path.getFileName().toString().toUpperCase().contains("PROGRAM.CS"))
+                    .parallel(); // Xử lý song song
 
             // Đọc và kết hợp mã từ từng tệp .cs
             for (Path path : filePaths.collect(Collectors.toList())) {
@@ -81,7 +84,6 @@ public class CodeNormalizer {
             // Thử đọc tệp với mã hóa UTF-8
             return Files.readString(path, StandardCharsets.UTF_8);
         } catch (MalformedInputException e) {
-            System.err.println("UTF-8 decoding failed for file: " + path + ", attempting ISO-8859-1");
             try {
                 // Nếu UTF-8 thất bại, thử đọc bằng ISO-8859-1
                 return Files.readString(path, Charset.forName("ISO-8859-1"));
@@ -98,3 +100,4 @@ public class CodeNormalizer {
         return "";
     }
 }
+
