@@ -196,11 +196,6 @@
             <artifactId>commons-text</artifactId>
             <version>1.12.0</version>
         </dependency>
-        <dependency> 
-            <groupId>org.antlr</groupId> 
-            <artifactId>antlr4</artifactId> 
-            <version>4.13.2</version> 
-        </dependency>
     </dependencies>
     
     <build>
@@ -240,27 +235,6 @@
                     <source>23</source>
                     <target>23</target>
                 </configuration>
-            </plugin>
-            <!-- Check plagiarism -->
-            <plugin>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-maven-plugin</artifactId>
-                <version>4.13.2</version>
-                <configuration>
-                    <sourceDirectory>${project.basedir}/src/main/antlr4</sourceDirectory>
-                    <outputDirectory>${project.basedir}/src/main/java/com/CodeEvalCrew/AutoScore/antlr4</outputDirectory>
-                    <arguments>
-                        <argument>-package</argument>
-                        <argument>com.CodeEvalCrew.AutoScore.antlr4</argument>
-                    </arguments>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>antlr4</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

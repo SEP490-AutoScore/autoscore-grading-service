@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,6 +34,7 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Score;
 import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 import com.CodeEvalCrew.AutoScore.repositories.score_repository.ScoreRepository;
 import com.CodeEvalCrew.AutoScore.repositories.student_repository.StudentRepository;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -53,64 +55,69 @@ public class SourceCheckUtil implements ISourceCheckUtil {
     public List<StudentSourceInfoDTO> getImportantToCheck(List<Important> importants, List<StudentSource> students, Exam_Paper examPaper) throws Exception, NotFoundException {
         List<StudentSourceInfoDTO> result = new ArrayList<>();
         for (StudentSource student : students) {
-            boolean isPass = true;
-            String error = "";
-            for (Important important : importants) {
-                
-                switch (important.getImportantCode()) {
-                    case "SLN" -> {
-                        String solutionName = examPaper.getExam().getExamCode() + "_" + examPaper.getExamPaperCode() + "_" + student.getStudent().getStudentCode();
-                        Optional<String> SLNFlag = checkSolutionName(solutionName, student.getSourceDetail().getStudentSourceCodePath());
-                        if (SLNFlag == null) {
-                            isPass = false;
-                            error += String.format("Solution with %s not found;", solutionName);
-                        }
-                    }
-                    case "CNS" -> {
-                        Optional<String> CNTFlag = checkConnectionStrings(student.getSourceDetail().getStudentSourceCodePath(), SECTION_STRING, NODE_DATABASE_STRING, APPSETTING_NAME);
-                        if (CNTFlag == null) {
-                            isPass = false;
-                            error += "Connection String not found;";
-                        }
-                    }
-                    case "SST" -> {
-                        Optional<String> SSTFlag = checkSourceStructure(student.getSourceDetail().getStudentSourceCodePath(), REQUIRE_PROJ);
-                        if (SSTFlag == null) {
-                            isPass = false;
-                            error += "Source structure not valid;";
-                        }
-                    }
-                    default ->
-                        throw new Exception("Important not found");
-                }
-            }
+            System.out.println("Checking for student: " + student.getStudent().getStudentCode());
 
-            if (isPass) {
-                result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+            if (student.getSourceDetail() == null) {
+                System.out.println("Source null!!");
             } else {
-                Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudent().getStudentId(), examPaper.getExamPaperId());
-                if (score == null) {
-                    score = new Score();
-                    Student stu = studentRepository.findById(student.getStudent().getStudentId()).get();
-                    if (stu == null) {
-                        
+                boolean isPass = true;
+                String error = "";
+                for (Important important : importants) {
+                    switch (important.getImportantCode()) {
+                        case "SLN" -> {
+                            String solutionName = examPaper.getExam().getExamCode() + "_" + examPaper.getExamPaperCode() + "_" + student.getStudent().getStudentCode();
+                            Optional<String> SLNFlag = checkSolutionName(solutionName, student.getSourceDetail().getStudentSourceCodePath());
+                            if (SLNFlag == null) {
+                                isPass = false;
+                                error += String.format("Solution with %s not found;", solutionName);
+                            }
+                        }
+                        case "CNS" -> {
+                            Optional<String> CNTFlag = checkConnectionStrings(student.getSourceDetail().getStudentSourceCodePath(), SECTION_STRING, NODE_DATABASE_STRING, APPSETTING_NAME);
+                            if (CNTFlag == null) {
+                                isPass = false;
+                                error += "Connection String not found;";
+                            }
+                        }
+                        case "SST" -> {
+                            Optional<String> SSTFlag = checkSourceStructure(student.getSourceDetail().getStudentSourceCodePath(), REQUIRE_PROJ);
+                            if (SSTFlag == null) {
+                                isPass = false;
+                                error += "Source structure not valid;";
+                            }
+                        }
+                        default ->
+                            throw new Exception("Important not found");
                     }
-                    score.setStudent(stu);
+                    if (isPass) {
+                        result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+                    } else {
+                        Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudent().getStudentId(), examPaper.getExamPaperId());
+                        if (score == null) {
+                            score = new Score();
+                            Student stu = studentRepository.findById(student.getStudent().getStudentId()).get();
+                            if (stu == null) {
 
-                    Exam_Paper examPaperToSave = new Exam_Paper();
-                    examPaperToSave.setExamPaperId(examPaper.getExamPaperId());
-                    score.setExamPaper(examPaper);
-                    score.setTotalScore(0.0f);
-                    score.setGradedAt(LocalDateTime.now());
-                    score.setReason(error);
-                    scoreRepository.save(score);
-                    error = "";
-                } else {
-                    score.setReason(error);
-                    scoreRepository.save(score);
-                    error = "";
+                            }
+                            score.setStudent(stu);
+
+                            Exam_Paper examPaperToSave = new Exam_Paper();
+                            examPaperToSave.setExamPaperId(examPaper.getExamPaperId());
+                            score.setExamPaper(examPaper);
+                            score.setTotalScore(0.0f);
+                            score.setGradedAt(LocalDateTime.now());
+                            score.setReason(error);
+                            scoreRepository.save(score);
+                            error = "";
+                        } else {
+                            score.setReason(error);
+                            scoreRepository.save(score);
+                            error = "";
+                        }
+                    }
                 }
             }
+
         }
         return result;
     }
@@ -136,10 +143,20 @@ public class SourceCheckUtil implements ISourceCheckUtil {
 
     private Optional<String> checkConnectionStrings(String sourcePath, String section, String dbNode, String fileName) throws Exception, NotFoundException {
         Optional<String> jsonPath = findAppsettingsJsonPath(sourcePath);
-        if (jsonPath.isEmpty()) {
+        List<String> jsonPaths = findAllAppsettingsJsonPaths(sourcePath);
+        if (jsonPaths.isEmpty()) {
             throw new NotFoundException(fileName + " not found");
         }
-        boolean flag = analyzeAppSettings(jsonPath.get(), section, dbNode);
+        // boolean flag = analyzeAppSettings(jsonPath.get(), section, dbNode);
+
+        boolean flag = false;
+        for (String path : jsonPaths) {
+            boolean isExisted = analyzeAppSettings(path, section, dbNode);
+            if (isExisted) {
+                flag = true;
+            }
+        }
+
         if (flag) {
             return Optional.of("PASS");
         }
@@ -254,6 +271,7 @@ public class SourceCheckUtil implements ISourceCheckUtil {
     //read appsetting
     public static boolean analyzeAppSettings(String filePath, String sectionName, String dbNode) {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(JsonParser.Feature.ALLOW_COMMENTS, true);
         boolean result = false;
         try {
             // Parse the JSON file
@@ -262,7 +280,7 @@ public class SourceCheckUtil implements ISourceCheckUtil {
             // Check for known sections, e.g., "ConnectionStrings"
             if (rootNode.has(sectionName)) {
                 System.out.println(sectionName + " section found.");
-                JsonNode sectionNode = rootNode.get(sectionName);
+                // JsonNode sectionNode = rootNode.get(sectionName);
                 result = true;
                 // // Check if the ConnectionStrings section has a DefaultConnection node
                 // if (sectionName.equals(sectionName) && sectionNode.has(dbNode)) {
@@ -312,6 +330,21 @@ public class SourceCheckUtil implements ISourceCheckUtil {
         } catch (IOException e) {
             System.err.println("Error searching directory: " + directoryPath);
             return Optional.empty();
+        }
+    }
+
+    public static List<String> findAllAppsettingsJsonPaths(String directoryPath) {
+        try {
+            // Search for all appsettings.json files in the specified directory and its subdirectories
+            return Files.walk(Paths.get(directoryPath))
+                    .filter(Files::isRegularFile)
+                    .filter(file -> file.getFileName().toString().equals("appsettings.json")) // Find appsettings.json
+                    .map(Path::toString) // Convert Path to String
+                    .collect(Collectors.toList()); // Collect all matching file paths as a List
+
+        } catch (IOException e) {
+            System.err.println("Error searching directory: " + directoryPath);
+            return List.of(); // Return an empty list if there's an exception
         }
     }
 
@@ -373,11 +406,9 @@ public class SourceCheckUtil implements ISourceCheckUtil {
     //         // csprojFiles.forEach(file -> System.out.println(file.getAbsolutePath()));
     //     }
     //     File mainProject = findMainProject(csprojFiles);
-
     //     boolean allReferenced = checkAllProjectsReferenced(csprojFiles, mainProject);
     //     System.out.println(allReferenced ? "All non-main projects are referenced." : "Some non-main projects are not referenced by others.");
     // }
-
     static boolean checkAllProjectsReferenced(List<File> csprojFiles, File mainProject) {
         Map<String, List<String>> projectReferences = new HashMap<>();
 

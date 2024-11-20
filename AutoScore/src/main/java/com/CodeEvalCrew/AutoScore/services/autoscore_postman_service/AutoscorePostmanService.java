@@ -62,6 +62,7 @@ import com.CodeEvalCrew.AutoScore.repositories.score_repository.ScoreRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceRepository;
 import com.CodeEvalCrew.AutoScore.repositories.student_repository.StudentRepository;
+import com.CodeEvalCrew.AutoScore.utils.PathUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -76,16 +77,16 @@ import com.github.dockerjava.okhttp.OkHttpDockerCmdExecFactory;
 @Service
 public class AutoscorePostmanService implements IAutoscorePostmanService {
 
-    private static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
-    private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    private static final String DB_SERVER = "192.168.1.223\\SQLSERVER";
-    private static final String DB_UID = "sa";
-    private static final String DB_PWD = "123456";
-    private static final String DOCKER_DESKTOP_PATH = "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe";
-    private static final String NEWMAN_CMD_PATH = "C:\\Users\\nhatt\\AppData\\Roaming\\npm\\newman.cmd";
-    private static final int BASE_PORT = 10000;
-    String directoryPath = "C:\\Project\\AutoScore\\Grading";
-    private static final String CONFIG_MEMORY_PROCESSOR = "C:\\Users\\Admin\\.wslconfig";
+    // private static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    // private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+    // private static final String DB_SERVER = "192.168.1.223\\SQLSERVER";
+    // private static final String DB_UID = "sa";
+    // private static final String DB_PWD = "123456";
+    // private static final String DOCKER_DESKTOP_PATH = "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe";
+    // private static final String NEWMAN_CMD_PATH = "C:\\Users\\nhatt\\AppData\\Roaming\\npm\\newman.cmd";
+    // private static final int BASE_PORT = 10000;
+    // String directoryPath = "C:\\Project\\AutoScore\\Grading";
+    // private static final String CONFIG_MEMORY_PROCESSOR = "C:\\Users\\Admin\\.wslconfig";
 
     @Autowired
     private SourceRepository sourceRepository;
@@ -114,22 +115,22 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
         // Config memory and processor for deploying docker
         try {
-            File configFile = new File(CONFIG_MEMORY_PROCESSOR);
+            File configFile = new File(PathUtil.CONFIG_MEMORY_PROCESSOR);
 
             // Check conditions for memory_Megabyte and processors
             if (memory_Megabyte == 0 || processors == 0) {
                 // Delete the .wslconfig file if it exists
                 if (configFile.exists()) {
-                    Files.delete(Path.of(CONFIG_MEMORY_PROCESSOR));
+                    Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
                     System.out.println(".wslconfig file deleted due to zero memory or processors request.");
                 }
             } else {
                 // Delete the .wslconfig file if it exists and create a new one
                 if (configFile.exists()) {
-                    Files.delete(Path.of(CONFIG_MEMORY_PROCESSOR));
+                    Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
                 }
 
-                try (FileWriter writer = new FileWriter(CONFIG_MEMORY_PROCESSOR)) {
+                try (FileWriter writer = new FileWriter(PathUtil.CONFIG_MEMORY_PROCESSOR)) {
                     writer.write("[wsl2]\n");
                     writer.write("memory=" + memory_Megabyte + "MB\n");
                     writer.write("processors=" + processors + "\n");
@@ -166,7 +167,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // .collect(Collectors.toList());
 
         deleteAndCreateDatabaseByExamPaperId(examPaperId);
-        deleteAllFilesAndFolders(directoryPath);
+        deleteAllFilesAndFolders(PathUtil.DIRECTORY_PATH);
 
         processStudentSolutions(studentSources, examPaperId, numberDeploy);
 
@@ -185,12 +186,12 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         return studentsWithScores;
     }
 
-    public void processStudentSolutions(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int batchSize) {
-        int totalBatches = (int) Math.ceil((double) studentSources.size() / batchSize);
+    public void processStudentSolutions(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int numberDeploy) {
+        int totalBatches = (int) Math.ceil((double) studentSources.size() / numberDeploy);
 
         for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-            int start = batchIndex * batchSize;
-            int end = Math.min(start + batchSize, studentSources.size());
+            int start = batchIndex * numberDeploy;
+            int end = Math.min(start + numberDeploy, studentSources.size());
             List<StudentSourceInfoDTO> currentBatch = studentSources.subList(start, end);
 
             ExecutorService executor = Executors.newFixedThreadPool(currentBatch.size());
@@ -202,7 +203,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             for (int i = 0; i < currentBatch.size(); i++) {
                 StudentSourceInfoDTO studentSource = currentBatch.get(i);
                 Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
-                int port = BASE_PORT + i;
+                int port = PathUtil.BASE_PORT + i;
                 Long studentId = studentSource.getStudentId();
 
                 createFileCollectionPostman(examPaperId, studentSource.getSourceDetailId(), port);
@@ -307,7 +308,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
         try {
             // Tạo thư mục sinh viên nếu chưa có
-            Path studentDir = Paths.get(directoryPath, String.valueOf(studentId));
+            Path studentDir = Paths.get(PathUtil.DIRECTORY_PATH, String.valueOf(studentId));
             Files.createDirectories(studentDir);
 
             // Lấy dữ liệu collection và tạo file Postman
@@ -337,7 +338,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             System.out.println("Running Newman for studentId: " + studentId);
 
             // Cấu hình ProcessBuilder
-            ProcessBuilder processBuilder = new ProcessBuilder(NEWMAN_CMD_PATH, "run", postmanFilePath.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder(PathUtil.NEWMAN_CMD_PATH, "run", postmanFilePath.toString());
 
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
@@ -481,6 +482,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // Cập nhật lại tổng điểm vào Score
         score.setTotalScore(totalScoreAchieve);
         scoreRepository.save(score); // Lưu lại Score với totalScore đã cập nhật
+        score.setReason(reasonBuilder.toString()); // Gán lý do vào trường reason
         System.out.println("Saved total score: " + totalScoreAchieve);
         reasonBuilder.append("Saved total score: ").append(totalScoreAchieve).append("\n");
     }
@@ -544,27 +546,73 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
         Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
         Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
-
+    
+        // Executor service để quản lý các luồng
+        ExecutorService executor = Executors.newFixedThreadPool(1); // Mỗi tiến trình chạy trong một luồng riêng biệt
+    
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
-            processBuilder.directory(dirPath.toFile());
-            processBuilder.inheritIO();
-
-            Process process = processBuilder.start();
-
-            int exitCode = process.waitFor();
-
-            if (exitCode == 0) {
-                return new StudentDeployResult(studentId, true, "Deploy thành công");
-            } else {
-                return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
-            }
-
-        } catch (IOException | InterruptedException e) {
+            // Gửi công việc vào một luồng riêng biệt để thực thi lệnh docker-compose
+            Future<StudentDeployResult> future = executor.submit(() -> {
+                ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
+                processBuilder.directory(dirPath.toFile());
+    
+                // Cho phép tiến trình con sử dụng đầu ra của terminal
+                processBuilder.inheritIO();
+    
+                try {
+                    // Bắt đầu quá trình docker-compose
+                    Process process = processBuilder.start();
+                    int exitCode = process.waitFor();
+    
+                    if (exitCode == 0) {
+                        return new StudentDeployResult(studentId, true, "Deploy thành công");
+                    } else {
+                        return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
+                    }
+    
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                    return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+                }
+            });
+    
+            // Chờ cho tiến trình hoàn thành và nhận kết quả
+            return future.get(); // Block cho đến khi tiến trình hoàn tất
+    
+        } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+        } finally {
+            // Đảm bảo tắt executor sau khi hoàn thành
+            executor.shutdown();
         }
     }
+
+    
+    // private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
+    //     Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
+    //     Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
+
+    //     try {
+    //         ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
+    //         processBuilder.directory(dirPath.toFile());
+    //         processBuilder.inheritIO();
+
+    //         Process process = processBuilder.start();
+
+    //         int exitCode = process.waitFor();
+
+    //         if (exitCode == 0) {
+    //             return new StudentDeployResult(studentId, true, "Deploy thành công");
+    //         } else {
+    //             return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
+    //         }
+
+    //     } catch (IOException | InterruptedException e) {
+    //         e.printStackTrace();
+    //         return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
+    //     }
+    // }
 
     private void recordFailure(Long studentId, Long examPaperId, String reason) {
         Student student = scoreRepository.findStudentById(studentId);
@@ -614,9 +662,9 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             ObjectNode connectionStringsNode = (ObjectNode) rootNode.get("ConnectionStrings");
             connectionStringsNode.fieldNames().forEachRemaining(key -> {
                 connectionStringsNode.put(key, String.join(";",
-                        "Server=" + DB_SERVER,
-                        "uid=" + DB_UID,
-                        "pwd=" + DB_PWD,
+                        "Server=" + PathUtil.DB_SERVER,
+                        "uid=" + PathUtil.DB_UID,
+                        "pwd=" + PathUtil.DB_PWD,
                         "database=" + databaseName,
                         "TrustServerCertificate=True"));
             });
@@ -627,7 +675,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Files.writeString(filePath, content, StandardCharsets.UTF_8);
     }
 
-    public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) throws IOException {
+    public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) {
         try (Stream<Path> folders = Files.walk(dirPath, 1)) {
             List<Path> targetDirs = folders
                     .filter(Files::isDirectory)
@@ -639,6 +687,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                         }
                     })
                     .collect(Collectors.toList());
+    
             for (Path targetDir : targetDirs) {
                 try (Stream<Path> paths = Files.walk(targetDir)) {
                     paths.filter(Files::isRegularFile)
@@ -647,18 +696,52 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                                 try {
                                     updateAppsettingsJson(path, examPaperId, port);
                                 } catch (IOException e) {
+                                    // Log lỗi và tiếp tục thực thi
                                     System.err.println("Error updating: " + path + " - " + e.getMessage());
                                 }
                             });
+                } catch (IOException e) {
+                    System.err.println("Error walking through files in directory: " + targetDir + " - " + e.getMessage());
                 }
             }
+        } catch (IOException e) {
+            System.err.println("Error walking through directories: " + dirPath + " - " + e.getMessage());
         }
     }
 
+
+    // public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) throws IOException {
+    //     try (Stream<Path> folders = Files.walk(dirPath, 1)) {
+    //         List<Path> targetDirs = folders
+    //                 .filter(Files::isDirectory)
+    //                 .filter(path -> {
+    //                     try (Stream<Path> files = Files.walk(path, 1)) {
+    //                         return files.anyMatch(file -> file.getFileName().toString().equalsIgnoreCase("Program.cs"));
+    //                     } catch (IOException e) {
+    //                         return false;
+    //                     }
+    //                 })
+    //                 .collect(Collectors.toList());
+    //         for (Path targetDir : targetDirs) {
+    //             try (Stream<Path> paths = Files.walk(targetDir)) {
+    //                 paths.filter(Files::isRegularFile)
+    //                         .filter(path -> path.toString().endsWith("appsettings.json"))
+    //                         .forEach(path -> {
+    //                             try {
+    //                                 updateAppsettingsJson(path, examPaperId, port);
+    //                             } catch (IOException e) {
+    //                                 System.err.println("Error updating: " + path + " - " + e.getMessage());
+    //                             }
+    //                         });
+    //             }
+    //         }
+    //     }
+    // }
+
     private void deleteAndCreateDatabaseByExamPaperId(Long examPaperId) {
         try {
-            Class.forName(DB_DRIVER);
-            try (Connection connection = DriverManager.getConnection(DB_URL);
+            Class.forName(PathUtil.DB_DRIVER);
+            try (Connection connection = DriverManager.getConnection(PathUtil.DB_URL);
                     Statement statement = connection.createStatement()) {
 
                 String databaseName = examDatabaseRepository.findDatabaseNameByExamPaperId(examPaperId);
@@ -816,7 +899,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         try {
             // Khởi động Docker Desktop
             Process process = new ProcessBuilder(
-                    "cmd.exe", "/c", "start", "\"\"", "\"" + DOCKER_DESKTOP_PATH + "\"").start();
+                    "cmd.exe", "/c", "start", "\"\"", "\"" + PathUtil.DOCKER_DESKTOP_PATH + "\"").start();
 
             // Đợi một vài giây cho Docker khởi động
             Thread.sleep(5000);
@@ -852,7 +935,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             // Chạy newman với file tạm
             ProcessBuilder processBuilder = new ProcessBuilder(
-                    NEWMAN_CMD_PATH,
+                PathUtil.NEWMAN_CMD_PATH,
                     "run",
                     tempFile.toAbsolutePath().toString());
             processBuilder.redirectErrorStream(true);
