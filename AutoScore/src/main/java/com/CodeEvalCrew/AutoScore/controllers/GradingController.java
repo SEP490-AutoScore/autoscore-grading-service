@@ -2,7 +2,6 @@ package com.CodeEvalCrew.AutoScore.controllers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
-import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 import com.CodeEvalCrew.AutoScore.services.autoscore_postman_service.IAutoscorePostmanService;
 import com.CodeEvalCrew.AutoScore.services.check_important.ICheckImportant;
@@ -31,8 +29,6 @@ public class GradingController {
     private final IPlagiarismDetectionService plagiarismDetectionService;
     private final IScoreService scoreService;
 
-    private final SourceDetailRepository sourceDetailRepository;
-
     public GradingController(
             ICheckImportant checkimportant,
             IAutoscorePostmanService autoscorePostmanService,
@@ -43,21 +39,11 @@ public class GradingController {
         this.checkimportant = checkimportant;
         this.plagiarismDetectionService = plagiarismDetectionService;
         this.scoreService = scoreService;
-        this.sourceDetailRepository = sourceDetailRepository;
     }
 
     @PostMapping("")
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
-
-            List<Source_Detail> list = sourceDetailRepository.findAll();
-            List<Long> ax = new ArrayList<>();
-
-            for (Source_Detail id : list) {
-                ax.add(id.getStudent().getStudentId());
-            }
-            request.setListStudent(ax);
-
             LocalDateTime s = LocalDateTime.now();
             
             System.out.println("--------- Check Important ---------");

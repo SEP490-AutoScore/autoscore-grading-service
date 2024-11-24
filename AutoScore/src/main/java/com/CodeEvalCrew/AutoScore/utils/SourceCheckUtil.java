@@ -89,31 +89,32 @@ public class SourceCheckUtil implements ISourceCheckUtil {
                         default ->
                             throw new Exception("Important not found");
                     }
-                    if (isPass) {
-                        result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
-                    } else {
-                        Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudent().getStudentId(), examPaper.getExamPaperId());
-                        if (score == null) {
-                            score = new Score();
-                            Student stu = studentRepository.findById(student.getStudent().getStudentId()).get();
-                            if (stu == null) {
+                }
 
-                            }
-                            score.setStudent(stu);
+                if (isPass) {
+                    result.add(new StudentSourceInfoDTO(student.getSourceDetail().getSourceDetailId(), student.getStudent().getStudentId(), student.getSourceDetail().getStudentSourceCodePath()));
+                } else {
+                    Score score = scoreRepository.findByStudentIdAndExamPaperId(student.getStudent().getStudentId(), examPaper.getExamPaperId());
+                    if (score == null) {
+                        score = new Score();
+                        Student stu = studentRepository.findById(student.getStudent().getStudentId()).get();
+                        if (stu == null) {
 
-                            Exam_Paper examPaperToSave = new Exam_Paper();
-                            examPaperToSave.setExamPaperId(examPaper.getExamPaperId());
-                            score.setExamPaper(examPaper);
-                            score.setTotalScore(0.0f);
-                            score.setGradedAt(LocalDateTime.now());
-                            score.setReason(error);
-                            scoreRepository.save(score);
-                            error = "";
-                        } else {
-                            score.setReason(error);
-                            scoreRepository.save(score);
-                            error = "";
                         }
+                        score.setStudent(stu);
+
+                        Exam_Paper examPaperToSave = new Exam_Paper();
+                        examPaperToSave.setExamPaperId(examPaper.getExamPaperId());
+                        score.setExamPaper(examPaper);
+                        score.setTotalScore(0.0f);
+                        score.setGradedAt(LocalDateTime.now());
+                        score.setReason(error);
+                        scoreRepository.save(score);
+                        error = "";
+                    } else {
+                        score.setReason(error);
+                        scoreRepository.save(score);
+                        error = "";
                     }
                 }
             }
