@@ -31,12 +31,13 @@ public class Gherkin_Scenario {
     @Column(columnDefinition = "LONGTEXT")
     private String gherkinData;
 
-    private Long orderBy;
+    private boolean status;
 
     @ManyToOne
     @JoinColumn(name = "examQuestionId", nullable = false)
     private Exam_Question examQuestion;
 
-       @OneToOne(mappedBy = "gherkinScenario")
+    @OneToOne
+    @JoinColumn(name = "postmanForGradingId") 
     private Postman_For_Grading postmanForGrading;
 }
