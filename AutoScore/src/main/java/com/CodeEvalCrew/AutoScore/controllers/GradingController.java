@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +21,7 @@ import com.CodeEvalCrew.AutoScore.services.check_important.ICheckImportant;
 import com.CodeEvalCrew.AutoScore.services.plagiarism_check_service.IPlagiarismDetectionService;
 import com.CodeEvalCrew.AutoScore.services.score_service.IScoreService;
 
+
 @RestController
 @RequestMapping("/api/grading")
 public class GradingController {
@@ -28,17 +30,20 @@ public class GradingController {
     private final IAutoscorePostmanService autoscorePostmanService;
     private final IPlagiarismDetectionService plagiarismDetectionService;
     private final IScoreService scoreService;
+    private final SSEController sseController;
 
     public GradingController(
             ICheckImportant checkimportant,
             IAutoscorePostmanService autoscorePostmanService,
             IPlagiarismDetectionService plagiarismDetectionService,
             SourceDetailRepository sourceDetailRepository,
-            IScoreService scoreService) {
+            IScoreService scoreService,
+            SSEController sseController) {
         this.autoscorePostmanService = autoscorePostmanService;
         this.checkimportant = checkimportant;
         this.plagiarismDetectionService = plagiarismDetectionService;
         this.scoreService = scoreService;
+        this.sseController = sseController;
     }
 
     @PostMapping("")
@@ -68,5 +73,12 @@ public class GradingController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @GetMapping("test")
+    public String getMethodName() {
+        sseController.pushEvent(1l, "Grading", 1, 10, LocalDateTime.now());
+        return "new String()";
+    }
+    
 
 }

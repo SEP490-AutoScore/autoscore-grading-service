@@ -3,10 +3,14 @@ package com.CodeEvalCrew.AutoScore.models.Entity;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Status_Enum;
+
 import jakarta.persistence.Basic;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -33,7 +37,8 @@ public class Exam_Paper {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long examPaperId;
     private String examPaperCode;
-    private boolean status;
+    @Enumerated(EnumType.STRING)
+    private Exam_Status_Enum status;
     private String instruction;
     private LocalDateTime createdAt;
     private Long createdBy;

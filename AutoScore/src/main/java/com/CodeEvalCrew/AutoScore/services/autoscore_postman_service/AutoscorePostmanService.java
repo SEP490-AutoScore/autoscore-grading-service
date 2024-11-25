@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -42,12 +43,14 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.mappers.SourceDetailMapperforAutoscore;
 import com.CodeEvalCrew.AutoScore.models.DTO.ResponseDTO.StudentDeployResult;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Database;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Question;
+import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.Postman_For_Grading;
 import com.CodeEvalCrew.AutoScore.models.Entity.Score;
 import com.CodeEvalCrew.AutoScore.models.Entity.Score_Detail;
@@ -56,6 +59,7 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamPaperRepository;
 import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamQuestionRepository;
 import com.CodeEvalCrew.AutoScore.repositories.examdatabase_repository.IExamDatabaseRepository;
+import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.postman_for_grading.PostmanForGradingRepository;
 import com.CodeEvalCrew.AutoScore.repositories.score_detail_repository.ScoreDetailRepository;
 import com.CodeEvalCrew.AutoScore.repositories.score_repository.ScoreRepository;
@@ -87,9 +91,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     // private static final int BASE_PORT = 10000;
     // String directoryPath = "C:\\Project\\AutoScore\\Grading";
     // private static final String CONFIG_MEMORY_PROCESSOR = "C:\\Users\\Admin\\.wslconfig";
-
     @Autowired
     private SourceRepository sourceRepository;
+    @Autowired
+    private GradingProcessRepository gradingProcessRepository;
     @Autowired
     private SourceDetailRepository sourceDetailRepository;
     @Autowired
@@ -108,6 +113,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private IExamQuestionRepository examQuestionRepository;
     @Autowired
     private PostmanForGradingRepository postmanForGradingRepository;
+    @Autowired
+    private SSEController sseController;
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
@@ -165,7 +172,6 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // .stream()
         // .map(sourceDetail -> sourceDetailMapper.toDTO(sourceDetail))
         // .collect(Collectors.toList());
-
         deleteAndCreateDatabaseByExamPaperId(examPaperId);
         deleteAllFilesAndFolders(PathUtil.DIRECTORY_PATH);
 
@@ -178,9 +184,9 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                     return score != null && score.getTotalScore() > 0;
                 })
                 .map(student -> new StudentSourceInfoDTO(
-                        student.getSourceDetailId(),
-                        student.getStudentId(),
-                        student.getStudentSourceCodePath()))
+                student.getSourceDetailId(),
+                student.getStudentId(),
+                student.getStudentSourceCodePath()))
                 .collect(Collectors.toList());
 
         return studentsWithScores;
@@ -286,7 +292,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
                     System.out.println(
                             "Function passed count map for studentId " + successfulStudent.getStudentId() + ": "
-                                    + functionPassedCountMap);
+                            + functionPassedCountMap);
 
                     // Call saveScoreAndScoreDetail with the Map and logBuilder
                     saveScoreAndScoreDetail(successfulStudent.getStudentId(), examPaperId, functionPassedCountMap,
@@ -348,8 +354,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             try (
                     BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream(), "UTF-8"));
-                    BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
+                            new InputStreamReader(process.getInputStream(), "UTF-8")); BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
 
                 String line;
                 while ((line = reader.readLine()) != null) {
@@ -456,8 +461,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             totalScoreAchieve += scoreAchieve;
 
             // Nếu là chức năng cha, cập nhật parentScoreMap với scoreAchieve
-            if (postmanFunction.getPostmanForGradingParentId() == null ||
-                    postmanFunction.getPostmanForGradingParentId().equals(postmanFunction.getPostmanForGradingId())) {
+            if (postmanFunction.getPostmanForGradingParentId() == null
+                    || postmanFunction.getPostmanForGradingParentId().equals(postmanFunction.getPostmanForGradingId())) {
                 parentScoreMap.put(postmanFunction.getPostmanForGradingId(), scoreAchieve);
                 System.out.println("Updated parentScoreMap for function " + postmanFunction.getPostmanFunctionName()
                         + " with scoreAchieve: " + scoreAchieve);
@@ -485,6 +490,14 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         score.setReason(reasonBuilder.toString()); // Gán lý do vào trường reason
         System.out.println("Saved total score: " + totalScoreAchieve);
         reasonBuilder.append("Saved total score: ").append(totalScoreAchieve).append("\n");
+        Optional<GradingProcess> optionalProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(examPaper.getExamPaperId());
+        if (!optionalProcess.isPresent()) {
+            throw new NoSuchElementException("process not found");
+        }
+        GradingProcess gp = optionalProcess.get();
+        gp.setSuccessProcess(gp.getSuccessProcess() + 1);
+        sseController.pushEvent(gp.getProcessId(), "Grading", gp.getSuccessProcess(), gp.getTotalProcess(), gp.getStartDate());
+        gradingProcessRepository.save(gp);
     }
 
     private Float calculateScoreAchieve(Postman_For_Grading postmanFunction, Long noPmtestAchieve,
@@ -497,10 +510,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // (trỏ tới chính nó)
         if (parentId == null || parentId.equals(postmanFunction.getPostmanForGradingId())) {
             Float scoreAchieve = (noPmtestAchieve / (float) totalPmtest) * scoreOfFunction;
-            System.out.println("Calculating score for parent function: " + postmanFunction.getPostmanFunctionName() +
-                    ", noPmtestAchieve: " + noPmtestAchieve +
-                    ", totalPmtest: " + totalPmtest +
-                    ", scoreAchieve: " + scoreAchieve);
+            System.out.println("Calculating score for parent function: " + postmanFunction.getPostmanFunctionName()
+                    + ", noPmtestAchieve: " + noPmtestAchieve
+                    + ", totalPmtest: " + totalPmtest
+                    + ", scoreAchieve: " + scoreAchieve);
             reasonBuilder.append("Calculating score for parent function: ")
                     .append(postmanFunction.getPostmanFunctionName())
                     .append(", noPmtestAchieve: ")
@@ -511,8 +524,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                     .append(scoreAchieve)
                     .append("\n");
             return scoreAchieve;
-        }
-        // Nếu là chức năng con và chức năng cha có scoreAchieve = 0
+        } // Nếu là chức năng con và chức năng cha có scoreAchieve = 0
         else if (parentScoreMap.getOrDefault(parentId, 0.0f) == 0.0f) {
             Postman_For_Grading parentFunction = postmanForGradingRepository.findById(parentId).orElse(null);
             String parentFunctionName = (parentFunction != null) ? parentFunction.getPostmanFunctionName() : "Unknown";
@@ -527,10 +539,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         }
         // Trường hợp khác
         Float scoreAchieve = (noPmtestAchieve / (float) totalPmtest) * scoreOfFunction;
-        System.out.println("Calculating score for child function: " + postmanFunction.getPostmanFunctionName() +
-                ", noPmtestAchieve: " + noPmtestAchieve +
-                ", totalPmtest: " + totalPmtest +
-                ", scoreAchieve: " + scoreAchieve);
+        System.out.println("Calculating score for child function: " + postmanFunction.getPostmanFunctionName()
+                + ", noPmtestAchieve: " + noPmtestAchieve
+                + ", totalPmtest: " + totalPmtest
+                + ", scoreAchieve: " + scoreAchieve);
         reasonBuilder.append("Calculating score for child function: ")
                 .append(postmanFunction.getPostmanFunctionName())
                 .append(", noPmtestAchieve: ")
@@ -546,39 +558,39 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
         Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
         Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
-    
+
         // Executor service để quản lý các luồng
         ExecutorService executor = Executors.newFixedThreadPool(1); // Mỗi tiến trình chạy trong một luồng riêng biệt
-    
+
         try {
             // Gửi công việc vào một luồng riêng biệt để thực thi lệnh docker-compose
             Future<StudentDeployResult> future = executor.submit(() -> {
                 ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
                 processBuilder.directory(dirPath.toFile());
-    
+
                 // Cho phép tiến trình con sử dụng đầu ra của terminal
                 processBuilder.inheritIO();
-    
+
                 try {
                     // Bắt đầu quá trình docker-compose
                     Process process = processBuilder.start();
                     int exitCode = process.waitFor();
-    
+
                     if (exitCode == 0) {
                         return new StudentDeployResult(studentId, true, "Deploy thành công");
                     } else {
                         return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
                     }
-    
+
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                     return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
                 }
             });
-    
+
             // Chờ cho tiến trình hoàn thành và nhận kết quả
             return future.get(); // Block cho đến khi tiến trình hoàn tất
-    
+
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
@@ -588,32 +600,25 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         }
     }
 
-    
     // private StudentDeployResult deployStudentSolution(StudentSourceInfoDTO studentSource) {
     //     Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
     //     Long studentId = studentSource.getStudentId(); // Lưu lại studentId để trả về kết quả
-
     //     try {
     //         ProcessBuilder processBuilder = new ProcessBuilder("docker-compose", "up", "-d", "--build");
     //         processBuilder.directory(dirPath.toFile());
     //         processBuilder.inheritIO();
-
     //         Process process = processBuilder.start();
-
     //         int exitCode = process.waitFor();
-
     //         if (exitCode == 0) {
     //             return new StudentDeployResult(studentId, true, "Deploy thành công");
     //         } else {
     //             return new StudentDeployResult(studentId, false, "Deploy thất bại với mã thoát: " + exitCode);
     //         }
-
     //     } catch (IOException | InterruptedException e) {
     //         e.printStackTrace();
     //         return new StudentDeployResult(studentId, false, "Exception: " + e.getMessage());
     //     }
     // }
-
     private void recordFailure(Long studentId, Long examPaperId, String reason) {
         Student student = scoreRepository.findStudentById(studentId);
         if (student != null && student.getOrganization() != null) {
@@ -687,7 +692,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                         }
                     })
                     .collect(Collectors.toList());
-    
+
             for (Path targetDir : targetDirs) {
                 try (Stream<Path> paths = Files.walk(targetDir)) {
                     paths.filter(Files::isRegularFile)
@@ -708,7 +713,6 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             System.err.println("Error walking through directories: " + dirPath + " - " + e.getMessage());
         }
     }
-
 
     // public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) throws IOException {
     //     try (Stream<Path> folders = Files.walk(dirPath, 1)) {
@@ -737,12 +741,10 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     //         }
     //     }
     // }
-
     private void deleteAndCreateDatabaseByExamPaperId(Long examPaperId) {
         try {
             Class.forName(PathUtil.DB_DRIVER);
-            try (Connection connection = DriverManager.getConnection(PathUtil.DB_URL);
-                    Statement statement = connection.createStatement()) {
+            try (Connection connection = DriverManager.getConnection(PathUtil.DB_URL); Statement statement = connection.createStatement()) {
 
                 String databaseName = examDatabaseRepository.findDatabaseNameByExamPaperId(examPaperId);
                 Exam_Database examDatabase = examDatabaseRepository.findByExamPaperExamPaperId(examPaperId);
@@ -752,11 +754,11 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                     System.out.println("Found Exam_Database ID: " + examDatabaseId);
 
                     if (databaseName != null && !databaseName.isEmpty()) {
-                        String sql = "IF EXISTS (SELECT name FROM sys.databases WHERE name = '" + databaseName + "') " +
-                                "BEGIN " +
-                                "   ALTER DATABASE [" + databaseName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
-                                "   DROP DATABASE [" + databaseName + "]; " +
-                                "END";
+                        String sql = "IF EXISTS (SELECT name FROM sys.databases WHERE name = '" + databaseName + "') "
+                                + "BEGIN "
+                                + "   ALTER DATABASE [" + databaseName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "
+                                + "   DROP DATABASE [" + databaseName + "]; "
+                                + "END";
                         statement.executeUpdate(sql);
                         System.out.println("Database " + databaseName + " has been deleted.");
                     }
@@ -935,7 +937,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             // Chạy newman với file tạm
             ProcessBuilder processBuilder = new ProcessBuilder(
-                PathUtil.NEWMAN_CMD_PATH,
+                    PathUtil.NEWMAN_CMD_PATH,
                     "run",
                     tempFile.toAbsolutePath().toString());
             processBuilder.redirectErrorStream(true);
