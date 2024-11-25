@@ -473,7 +473,11 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             // Create Score_Detail for each Postman_For_Grading
             Score_Detail scoreDetail = new Score_Detail();
             scoreDetail.setScore(score);
-            scoreDetail.setExamQuestion(question);
+            // scoreDetail.setExamQuestion(question);
+             // Chỉ set examQuestion nếu có dữ liệu (không phải null)
+    if (question != null) {
+        scoreDetail.setExamQuestion(question);
+    }
             scoreDetail.setPostmanFunctionName(postmanFunction.getPostmanFunctionName());
             scoreDetail.setScoreOfFunction(postmanFunction.getScoreOfFunction());
             scoreDetail.setTotalPmtest(postmanFunction.getTotalPmTest());
