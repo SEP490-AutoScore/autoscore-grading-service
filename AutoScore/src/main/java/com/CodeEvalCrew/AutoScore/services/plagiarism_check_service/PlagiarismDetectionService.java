@@ -45,7 +45,7 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     private final Set<String> fingerprintDatabase = new HashSet<>();
     private static final int THRESHOLD_LOW = 50;
     private static final int THRESHOLD_HIGH = 70;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+    private final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private final GradingProcessRepository gradingProcessRepository;
     private final SSEController sseController;
 
