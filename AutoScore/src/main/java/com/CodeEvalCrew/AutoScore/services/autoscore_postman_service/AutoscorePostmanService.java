@@ -139,7 +139,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             sseController.pushEvent(1L, "Exam Paper không có dữ liệu Postman Collection.", 0, 10, LocalDateTime.now());
             return null;
         }
-
+//
         if (!Boolean.TRUE.equals(examPaper.getIsComfirmFile())) {
             System.err.println("Exam Paper chưa được xác nhận.");
             sseController.pushEvent(1L, "Exam Paper chưa được xác nhận.", 0, 10, LocalDateTime.now());
