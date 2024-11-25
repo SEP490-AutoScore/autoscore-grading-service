@@ -13,6 +13,6 @@ public interface PostmanForGradingRepository extends JpaRepository<Postman_For_G
     // List<Postman_For_Grading> findByExamPaperIdOrderByOrderBy(@Param("examPaperId") Long examPaperId);
     // @Query("SELECT p FROM Postman_For_Grading p WHERE p.examPaper.examPaperId = :examPaperId AND p.status = true ORDER BY p.orderBy")
     // List<Postman_For_Grading> findByExamPaperIdAndStatusTrueOrderByOrderBy(@Param("examPaperId") Long examPaperId);
-    List<Postman_For_Grading> findByExamPaper_ExamPaperIdAndStatusTrueOrderByOrderByAsc(Long examPaperId);
+    List<Postman_For_Grading> findByExamPaper_ExamPaperIdAndStatusTrueOrderByOrderPriorityAsc(Long examPaperId);
 
 }
