@@ -1092,6 +1092,42 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     
     
 
+    // private boolean comparePostmanResults(String postmanResult, Long examPaperId) {
+    //     // Tạo mảng từ kết quả Postman bằng cách lấy chuỗi sau dấu "→" và bỏ qua dấu cách
+    //     List<String> postmanOutputFunctions = Arrays.stream(postmanResult.split("\n"))
+    //             .filter(line -> line.contains("→"))
+    //             .map(line -> {
+    //                 int arrowIndex = line.indexOf("→");
+    //                 if (arrowIndex != -1 && arrowIndex + 1 < line.length()) {
+    //                     return line.substring(arrowIndex + 2).trim(); // Bỏ qua dấu cách sau dấu "→"
+    //                 }
+    //                 return ""; // Nếu không có dấu "→", trả về chuỗi rỗng
+    //             })
+    //             .collect(Collectors.toList());
+    
+    //     // Lấy danh sách Postman_For_Grading từ repository kèm theo điều kiện status = true
+    //     List<Postman_For_Grading> postmanGradings = postmanForGradingRepository
+    //     .findByExamPaper_ExamPaperIdAndStatus(examPaperId, true)
+    //     .stream()
+    //     .sorted(Comparator.comparing(Postman_For_Grading::getOrderPriority))
+    //     .collect(Collectors.toList());
+    
+    //     // Kiểm tra tính hợp lệ của orderPriority (bắt đầu từ 1 và tăng dần)
+    //     for (int i = 0; i < postmanGradings.size(); i++) {
+    //         if (!postmanGradings.get(i).getOrderPriority().equals((long) (i + 1))) {
+    //             System.err.println("Lỗi: orderPriority không hợp lệ (không bắt đầu từ 1 hoặc không tăng dần).");
+    //             return false;
+    //         }
+    //     }
+    
+    //     // Lấy danh sách postmanFunctionName từ danh sách đã kiểm tra
+    //     List<String> postmanFunctionNames = postmanGradings.stream()
+    //             .map(Postman_For_Grading::getPostmanFunctionName)
+    //             .collect(Collectors.toList());
+    
+    //     // So sánh hai mảng
+    //     return postmanOutputFunctions.equals(postmanFunctionNames);
+    // }
     private boolean comparePostmanResults(String postmanResult, Long examPaperId) {
         // Tạo mảng từ kết quả Postman bằng cách lấy chuỗi sau dấu "→" và bỏ qua dấu cách
         List<String> postmanOutputFunctions = Arrays.stream(postmanResult.split("\n"))
@@ -1105,12 +1141,9 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 })
                 .collect(Collectors.toList());
     
-        // Lấy danh sách Postman_For_Grading từ repository kèm theo điều kiện status = true
+        // Lấy danh sách Postman_For_Grading từ repository kèm theo điều kiện status = true và sắp xếp theo orderPriority
         List<Postman_For_Grading> postmanGradings = postmanForGradingRepository
-        .findByExamPaper_ExamPaperIdAndStatus(examPaperId, true)
-        .stream()
-        .sorted(Comparator.comparing(Postman_For_Grading::getOrderPriority))
-        .collect(Collectors.toList());
+                .findByExamPaper_ExamPaperIdAndStatusTrueOrderByOrderPriorityAsc(examPaperId);
     
         // Kiểm tra tính hợp lệ của orderPriority (bắt đầu từ 1 và tăng dần)
         for (int i = 0; i < postmanGradings.size(); i++) {
@@ -1128,6 +1161,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // So sánh hai mảng
         return postmanOutputFunctions.equals(postmanFunctionNames);
     }
+    
 
     
     public static Map.Entry<Path, String> findCsprojAndDotnetVersion(Path dirPath) throws IOException {
