@@ -1,34 +1,34 @@
 package com.CodeEvalCrew.AutoScore.models.Entity;
 
-import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Status_Enum;
+import java.time.LocalDateTime;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
 
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
-@ToString
-public class Important_Exam_Paper {
+public class GradingProcess {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long importantExamPaperId;
-    private Exam_Status_Enum status;
-    @ManyToOne
-    @JoinColumn(name = "importantId", nullable = false)
-    private Important important;
-    @ManyToOne
-    @JoinColumn(name = "examPaperId", nullable = false)
+    private Long processId;
+    private String status;
+    private int successProcess;
+    private int totalProcess;
+    private LocalDateTime startDate;
+    private LocalDateTime updateDate;
+    //n-1 exam
+    @OneToOne
+    @JoinColumn(name = "examPaperId", nullable = true)
     private Exam_Paper examPaper;
 }

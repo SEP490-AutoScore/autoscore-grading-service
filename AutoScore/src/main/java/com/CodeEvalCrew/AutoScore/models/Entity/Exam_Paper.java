@@ -3,10 +3,14 @@ package com.CodeEvalCrew.AutoScore.models.Entity;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Status_Enum;
+
 import jakarta.persistence.Basic;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -33,8 +37,11 @@ public class Exam_Paper {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long examPaperId;
     private String examPaperCode;
-    private boolean status;
+    @Enumerated(EnumType.STRING)
+    private Exam_Status_Enum status;
     private String instruction;
+    @Column(columnDefinition = "int default 90")
+    private int duration = 90;
     private LocalDateTime createdAt;
     private Long createdBy;
     private LocalDateTime updatedAt;
@@ -45,8 +52,8 @@ public class Exam_Paper {
     @Column(columnDefinition = "LONGBLOB")
     @Basic(fetch = FetchType.EAGER) // Buộc tải ngay lập tức
     private byte[] fileCollectionPostman;
-    private Boolean isComfirmFile;
-    private Boolean isUsed;
+    private Boolean isComfirmFile = false;
+    private Boolean isUsed = false;
 
     //Relationship
     //1-n score
@@ -55,7 +62,7 @@ public class Exam_Paper {
 
     //n-1 exam
     @ManyToOne
-    @JoinColumn(name = "examId", nullable = false)
+    @JoinColumn(name = "examId", nullable = true)
     private Exam exam;
 
     //1-n examquestion
@@ -67,4 +74,9 @@ public class Exam_Paper {
 
     @OneToMany(mappedBy = "examPaper", cascade = CascadeType.ALL)
     private Set<Postman_For_Grading> postmanForGradings;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "subjectId", referencedColumnName = "subjectId", nullable = false)
+    private Subject subject;
+
 }
