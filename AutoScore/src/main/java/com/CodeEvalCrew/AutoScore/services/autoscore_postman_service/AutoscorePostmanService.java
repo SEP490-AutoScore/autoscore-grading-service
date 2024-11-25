@@ -14,6 +14,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -22,7 +23,6 @@ import java.time.LocalDateTime;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -972,47 +972,103 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         }
     }
 
+    // private String runPostmanCollection(Long examPaperId) {
+    //     Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
+    //     if (examPaper == null || examPaper.getFileCollectionPostman() == null) {
+    //         System.err.println("Không tìm thấy Exam Paper hoặc fileCollectionPostman trống.");
+    //         sseController.pushEvent(1l, "Exam Paper or fileCollectionPostman are null", 0, 10, LocalDateTime.now());
+    //         return null;
+    //     }
+
+    //     try {
+    //         // Tạo file tạm và ghi nội dung của fileCollectionPostman vào
+    //         Path tempFile = Files.createTempFile("postman_collection_", ".json");
+    //         Files.write(tempFile, examPaper.getFileCollectionPostman(), StandardOpenOption.WRITE);
+
+    //         // Chạy newman với file tạm
+    //         ProcessBuilder processBuilder = new ProcessBuilder(
+    //                 PathUtil.NEWMAN_CMD_PATH,
+    //                 "run",
+    //                 tempFile.toAbsolutePath().toString());
+    //         processBuilder.redirectErrorStream(true);
+    //         Process process = processBuilder.start();
+
+    //         // Đọc kết quả từ newman
+    //         String result = new String(process.getInputStream().readAllBytes());
+    //         String errorOutput = new String(process.getErrorStream().readAllBytes()); // Đọc lỗi nếu có
+
+    //         // Kiểm tra nếu có lỗi
+    //         if (!errorOutput.isEmpty()) {
+    //             System.err.println("Error running Newman: " + errorOutput);
+    //             return null;
+    //         }
+
+    //         // Xóa file tạm sau khi sử dụng
+    //         Files.deleteIfExists(tempFile);
+
+    //         return result;
+
+    //     } catch (IOException e) {
+    //         e.printStackTrace();
+    //         return null;
+    //     }
+    // }
     private String runPostmanCollection(Long examPaperId) {
-        Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
-        if (examPaper == null || examPaper.getFileCollectionPostman() == null) {
-            System.err.println("Không tìm thấy Exam Paper hoặc fileCollectionPostman trống.");
-            sseController.pushEvent(1l, "Exam Paper or fileCollectionPostman are null", 0, 10, LocalDateTime.now());
-            return null;
-        }
-
-        try {
-            // Tạo file tạm và ghi nội dung của fileCollectionPostman vào
-            Path tempFile = Files.createTempFile("postman_collection_", ".json");
-            Files.write(tempFile, examPaper.getFileCollectionPostman(), StandardOpenOption.WRITE);
-
-            // Chạy newman với file tạm
-            ProcessBuilder processBuilder = new ProcessBuilder(
-                    PathUtil.NEWMAN_CMD_PATH,
-                    "run",
-                    tempFile.toAbsolutePath().toString());
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
-
-            // Đọc kết quả từ newman
-            String result = new String(process.getInputStream().readAllBytes());
-            String errorOutput = new String(process.getErrorStream().readAllBytes()); // Đọc lỗi nếu có
-
-            // Kiểm tra nếu có lỗi
-            if (!errorOutput.isEmpty()) {
-                System.err.println("Error running Newman: " + errorOutput);
-                return null;
-            }
-
-            // Xóa file tạm sau khi sử dụng
-            Files.deleteIfExists(tempFile);
-
-            return result;
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
+    Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
+    if (examPaper == null || examPaper.getFileCollectionPostman() == null) {
+        System.err.println("Không tìm thấy Exam Paper hoặc fileCollectionPostman trống.");
+        sseController.pushEvent(1l, "Exam Paper or fileCollectionPostman are null", 0, 10, LocalDateTime.now());
+        return null;
     }
+
+    try {
+        // Tạo tên file tạm ngẫu nhiên (20 ký tự từ a-zA-Z0-9)
+        String tempFileName = generateRandomString(20) + ".json";
+        Path tempFile = Files.createTempFile(tempFileName, "");
+        
+        // Ghi nội dung fileCollectionPostman vào file tạm
+        Files.write(tempFile, examPaper.getFileCollectionPostman(), StandardOpenOption.WRITE);
+
+        // Chạy Newman với file tạm
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                PathUtil.NEWMAN_CMD_PATH,
+                "run",
+                tempFile.toAbsolutePath().toString());
+        processBuilder.redirectErrorStream(true);
+        Process process = processBuilder.start();
+
+        // Đọc kết quả từ Newman
+        String result = new String(process.getInputStream().readAllBytes());
+        String errorOutput = new String(process.getErrorStream().readAllBytes()); // Đọc lỗi nếu có
+
+        // Kiểm tra nếu có lỗi
+        if (!errorOutput.isEmpty()) {
+            System.err.println("Error running Newman: " + errorOutput);
+            return null;
+        }
+
+        // Xóa file tạm sau khi sử dụng
+        Files.deleteIfExists(tempFile);
+
+        return result;
+
+    } catch (IOException e) {
+        e.printStackTrace();
+        return null;
+    }
+}
+
+// Hàm tạo chuỗi ngẫu nhiên gồm 20 ký tự từ a-zA-Z0-9
+private String generateRandomString(int length) {
+    String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    SecureRandom random = new SecureRandom();
+    StringBuilder sb = new StringBuilder(length);
+    for (int i = 0; i < length; i++) {
+        int index = random.nextInt(characters.length());
+        sb.append(characters.charAt(index));
+    }
+    return sb.toString();
+}
 
     // private boolean comparePostmanResults(String postmanResult, Long examPaperId) {
     //     // Tạo mảng từ kết quả Postman bằng cách lấy chuỗi sau dấu "→" trong mỗi dòng
@@ -1128,6 +1184,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     //     // So sánh hai mảng
     //     return postmanOutputFunctions.equals(postmanFunctionNames);
     // }
+
     private boolean comparePostmanResults(String postmanResult, Long examPaperId) {
         // Tạo mảng từ kết quả Postman bằng cách lấy chuỗi sau dấu "→" và bỏ qua dấu cách
         List<String> postmanOutputFunctions = Arrays.stream(postmanResult.split("\n"))
