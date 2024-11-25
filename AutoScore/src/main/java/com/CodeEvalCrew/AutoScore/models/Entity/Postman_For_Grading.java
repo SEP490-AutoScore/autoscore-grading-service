@@ -25,7 +25,6 @@ import lombok.ToString;
 @ToString
 public class Postman_For_Grading {
 
-   
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long postmanForGradingId;

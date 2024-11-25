@@ -68,8 +68,10 @@ public class GradingController {
 
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
+            sseController.pushEvent(1l, "Error when processing because not found something", 0, 10, LocalDateTime.now());
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
+            sseController.pushEvent(1l, "Error when processing", 0, 10, LocalDateTime.now());
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

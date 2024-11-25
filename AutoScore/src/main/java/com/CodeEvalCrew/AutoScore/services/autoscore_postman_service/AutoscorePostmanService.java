@@ -152,6 +152,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         String postmanResult = runPostmanCollection(examPaperId);
         if (postmanResult == null) {
             System.err.println("Không thể chạy Postman Collection.");
+            sseController.pushEvent(1l, "Cannot run Postman Collection.", 0, 10, LocalDateTime.now());
             return null;
         }
 
@@ -927,6 +928,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
         if (examPaper == null || examPaper.getFileCollectionPostman() == null) {
             System.err.println("Không tìm thấy Exam Paper hoặc fileCollectionPostman trống.");
+            sseController.pushEvent(1l, "Exam Paper or fileCollectionPostman are null", 0, 10, LocalDateTime.now());
             return null;
         }
 
