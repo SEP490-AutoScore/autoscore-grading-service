@@ -1,14 +1,13 @@
 package com.CodeEvalCrew.AutoScore.models.Entity;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,23 +20,18 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class Gherkin_Scenario {
+@Table(name = "account_selected_key")
+public class Account_Selected_Key {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long gherkinScenarioId;
-
-    @Lob
-    @Column(columnDefinition = "LONGTEXT")
-    private String gherkinData;
-
-    private boolean status;
-
-    @ManyToOne
-    @JoinColumn(name = "examQuestionId", nullable = false)
-    private Exam_Question examQuestion;
+    private Long accountSelectedKeyId;
 
     @OneToOne
-    @JoinColumn(name = "postmanForGradingId") 
-    private Postman_For_Grading postmanForGrading;
+    @JoinColumn(name = "accountId", nullable = false, unique = true) 
+    private Account account;
+
+    @ManyToOne 
+    @JoinColumn(name = "selectedAiApiKeyId", nullable = false)
+    private AI_Api_Key aiApiKey;
 }

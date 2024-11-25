@@ -1,14 +1,16 @@
 package com.CodeEvalCrew.AutoScore.models.Entity;
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Purpose_Enum;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,23 +23,22 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class Gherkin_Scenario {
+@Table(name = "content")
+public class Content {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long gherkinScenarioId;
+    private Long contentId;
 
+    @NotNull
     @Lob
     @Column(columnDefinition = "LONGTEXT")
-    private String gherkinData;
+    private String questionAskAiContent;
 
-    private boolean status;
+    private Long orderPriority;
 
-    @ManyToOne
-    @JoinColumn(name = "examQuestionId", nullable = false)
-    private Exam_Question examQuestion;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Purpose_Enum purpose;
 
-    @OneToOne
-    @JoinColumn(name = "postmanForGradingId") 
-    private Postman_For_Grading postmanForGrading;
-}
+} 

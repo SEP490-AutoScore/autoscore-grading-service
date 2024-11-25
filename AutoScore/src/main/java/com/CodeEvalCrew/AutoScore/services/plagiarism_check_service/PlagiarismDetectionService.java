@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -22,10 +24,13 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Type_Enum;
+import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.NGram;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
+import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 
 @Service
@@ -41,22 +46,34 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     private static final int THRESHOLD_LOW = 50;
     private static final int THRESHOLD_HIGH = 70;
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+    private final GradingProcessRepository gradingProcessRepository;
+    private final SSEController sseController;
 
     public PlagiarismDetectionService(SourceDetailRepository sourceDetailRepository, CodeNormalizer codeNormalizer,
             NGramGenerator nGramGenerator, FingerprintGenerator fingerprintGenerator, ScoreManager scoreManager,
-            FinalCheckPlagiarismService finalCheckPlagiarismService) {
+            FinalCheckPlagiarismService finalCheckPlagiarismService, GradingProcessRepository gradingProcessRepository, SSEController sseController) {
         this.sourceDetailRepository = sourceDetailRepository;
         this.codeNormalizer = codeNormalizer;
         this.nGramGenerator = nGramGenerator;
         this.fingerprintGenerator = fingerprintGenerator;
         this.scoreManager = scoreManager;
         this.finalCheckPlagiarismService = finalCheckPlagiarismService;
+        this.gradingProcessRepository = gradingProcessRepository;
+        this.sseController = sseController;
     }
 
     @Override
     @SuppressWarnings("CallToPrintStackTrace")
     public void runPlagiarismDetection(List<StudentSourceInfoDTO> sourceDetailsDTO, String examType, Long organizationId, Long examPaperId) {
         try {
+            Optional<GradingProcess> optionalProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(examPaperId);
+            if (!optionalProcess.isPresent()) {
+                throw new NoSuchElementException("process not found");
+            }
+            GradingProcess gp = optionalProcess.get();
+            gp.setStatus("Check plagiarism");
+            sseController.pushEvent(gp.getProcessId(), "Check plagiarism", gp.getSuccessProcess(), gp.getTotalProcess(), gp.getStartDate());
+            gradingProcessRepository.save(gp);
             System.out.println("Starting plagiarism detection for " + sourceDetailsDTO.size() + " source details.");
 
             Exam_Type_Enum examTypeEnum = Exam_Type_Enum.valueOf(examType);
@@ -98,6 +115,9 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             finalCheckPlagiarismService.finalCheckPlagiarism(examPaperId);
 
             executorService.shutdown();
+            gp.setStatus("Done");
+            sseController.pushEvent(gp.getProcessId(), "Done", gp.getSuccessProcess(), gp.getTotalProcess(), gp.getStartDate());
+            gradingProcessRepository.save(gp);
             System.gc();
             System.out.println("Plagiarism detection completed for all students.");
         } catch (InterruptedException e) {
@@ -119,7 +139,6 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             }
         }
     }
-
 
     private void runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
         String normalizedCode = codeNormalizer.normalizeCode(studentDetail.getStudentSourceCodePath());

@@ -10,18 +10,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
+import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
+import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.Important;
 import com.CodeEvalCrew.AutoScore.models.Entity.Important_Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
 import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamPaperRepository;
+import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.important_repository.ImportantExamPaperRepository;
-import com.CodeEvalCrew.AutoScore.repositories.important_repository.ImportantRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 import com.CodeEvalCrew.AutoScore.repositories.student_repository.StudentRepository;
 import com.CodeEvalCrew.AutoScore.utils.SourceCheckUtil;
@@ -33,7 +35,7 @@ public class CheckImportant implements ICheckImportant{
     @Autowired
     private final StudentRepository studentRepository;
     @Autowired
-    private final ImportantRepository importantRepository;
+    private final GradingProcessRepository gradingProcessRepository;
     @Autowired
     private final SourceDetailRepository sourceDetailREpository;
     @Autowired
@@ -41,19 +43,22 @@ public class CheckImportant implements ICheckImportant{
     @Autowired
     private final IExamPaperRepository examPaperRepository;
 
+    private final SSEController sseController;
     public CheckImportant(SourceCheckUtil utils,
                             StudentRepository studentRepository,
-                            ImportantRepository importantRepository,
+                            GradingProcessRepository gradingProcessRepository,
                             IExamPaperRepository examPaperRepository,
                             SourceDetailRepository sourceDetailREpository,
+                            SSEController sseController,
                             ImportantExamPaperRepository importantExamPaperRepository
                             ) {
-        this.importantRepository = importantRepository;
-        this.studentRepository = studentRepository;
-        this.examPaperRepository = examPaperRepository;
-        this.sourceDetailREpository = sourceDetailREpository;
-        this.importantExamPaperRepository = importantExamPaperRepository;
-        this.utils = utils;
+                                this.studentRepository = studentRepository;
+                                this.examPaperRepository = examPaperRepository;
+                                this.sourceDetailREpository = sourceDetailREpository;
+                                this.importantExamPaperRepository = importantExamPaperRepository;
+                                this.utils = utils;
+                                this.gradingProcessRepository = gradingProcessRepository;
+                                this.sseController = sseController;
     }
 
     @Override
@@ -80,6 +85,14 @@ public class CheckImportant implements ICheckImportant{
             }
 
             result = utils.getImportantToCheck(importants, students, examPaper);
+            Optional<GradingProcess> optionalProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(examPaper.getExamPaperId());
+            if (!optionalProcess.isPresent()) {
+                throw new NoSuchElementException("process not found");
+            }
+            GradingProcess gp = optionalProcess.get();
+            gp.setStatus("Grading");
+            sseController.pushEvent(gp.getProcessId(), "Grading", 0, gp.getTotalProcess(), gp.getStartDate());
+            gradingProcessRepository.save(gp);
 
             return result;
         } catch (NotFoundException | NoSuchElementException nfe) {
