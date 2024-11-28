@@ -15,6 +15,7 @@ import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.Important.StudentSource;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.Important;
@@ -90,8 +91,8 @@ public class CheckImportant implements ICheckImportant{
                 throw new NoSuchElementException("process not found");
             }
             GradingProcess gp = optionalProcess.get();
-            gp.setStatus("Grading");
-            sseController.pushEvent(gp.getProcessId(), "Grading", 0, gp.getTotalProcess(), gp.getStartDate());
+            gp.setStatus(GradingStatusEnum.GRADING);
+            sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), request.getExamPaperId());
             gradingProcessRepository.save(gp);
 
             return result;

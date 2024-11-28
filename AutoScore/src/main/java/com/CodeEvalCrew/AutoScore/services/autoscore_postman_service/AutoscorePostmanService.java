@@ -47,6 +47,7 @@ import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.mappers.SourceDetailMapperforAutoscore;
 import com.CodeEvalCrew.AutoScore.models.DTO.ResponseDTO.StudentDeployResult;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Database;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Question;
@@ -129,20 +130,20 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Optional<Exam_Paper> optionalExamPaper = examPaperRepository.findById(examPaperId);
         if (optionalExamPaper.isEmpty()) {
             System.err.println("Exam Paper not exits");
-            sseController.pushEvent(1L, "Exam Paper not exits", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
 
         Exam_Paper examPaper = optionalExamPaper.get();
         if (examPaper.getFileCollectionPostman() == null || examPaper.getFileCollectionPostman().length == 0) {
             System.err.println("No data of Postman Collection.");
-            sseController.pushEvent(1L, "No data of Postman Collection.", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
         //
         if (!Boolean.TRUE.equals(examPaper.getIsComfirmFile())) {
             System.err.println("File postman not confirm");
-            sseController.pushEvent(1L, "File postman not confirm", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
 
@@ -150,7 +151,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Optional<Exam_Database> optionalExamDatabase = examDatabaseRepository.findById(examPaper.getExamPaperId());
         if (optionalExamDatabase.isEmpty()) {
             System.err.println("Exam Database not exits");
-            sseController.pushEvent(1L, "Exam Database not exits", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
 
@@ -186,7 +187,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         String postmanResult = runPostmanCollection(examPaperId);
         if (postmanResult == null) {
             System.err.println("Can not run file Postman Collection.");
-            sseController.pushEvent(1l, "Cannot run file Postman Collection.", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
 
@@ -539,9 +540,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             throw new NoSuchElementException("process not found");
         }
         GradingProcess gp = optionalProcess.get();
-        gp.setSuccessProcess(gp.getSuccessProcess() + 1);
-        sseController.pushEvent(gp.getProcessId(), "Grading", gp.getSuccessProcess(), gp.getTotalProcess(),
-                gp.getStartDate());
+        sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), examPaperId);
         gradingProcessRepository.save(gp);
     }
 
@@ -923,7 +922,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
         if (examPaper == null || examPaper.getFileCollectionPostman() == null) {
             System.err.println("Exam Paper or fileCollectionPostman not exits.");
-            sseController.pushEvent(1l, "Exam Paper or fileCollectionPostman are null", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), examPaperId);
             return null;
         }
 

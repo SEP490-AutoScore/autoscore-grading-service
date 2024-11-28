@@ -5,7 +5,7 @@ public class PathUtil {
     //Sql server
     public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
     public static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    public static final String DB_SERVER = "192.168.1.223\\SQLSERVER";
+    public static final String DB_SERVER = "10.1.144.70\\SQLSERVER";
     public static final String DB_UID = "sa";
     public static final String DB_PWD = "123456";
 

@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 import com.CodeEvalCrew.AutoScore.services.autoscore_postman_service.IAutoscorePostmanService;
 import com.CodeEvalCrew.AutoScore.services.check_important.ICheckImportant;
+import com.CodeEvalCrew.AutoScore.services.grading_service.IGradingService;
 import com.CodeEvalCrew.AutoScore.services.plagiarism_check_service.IPlagiarismDetectionService;
 import com.CodeEvalCrew.AutoScore.services.score_service.IScoreService;
 
@@ -31,12 +33,14 @@ public class GradingController {
     private final IPlagiarismDetectionService plagiarismDetectionService;
     private final IScoreService scoreService;
     private final SSEController sseController;
+    private final IGradingService gradingService;
 
     public GradingController(
             ICheckImportant checkimportant,
             IAutoscorePostmanService autoscorePostmanService,
             IPlagiarismDetectionService plagiarismDetectionService,
             SourceDetailRepository sourceDetailRepository,
+            IGradingService gradingService,
             IScoreService scoreService,
             SSEController sseController) {
         this.autoscorePostmanService = autoscorePostmanService;
@@ -44,6 +48,7 @@ public class GradingController {
         this.plagiarismDetectionService = plagiarismDetectionService;
         this.scoreService = scoreService;
         this.sseController = sseController;
+        this.gradingService = gradingService;
     }
 
     @PostMapping("")
@@ -68,19 +73,26 @@ public class GradingController {
 
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
-            sseController.pushEvent(1l, "Error when processing because not found something", 0, 10, LocalDateTime.now());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), request.getExamPaperId());
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            sseController.pushEvent(1l, "Error when processing", 0, 10, LocalDateTime.now());
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), request.getExamPaperId());
+            return new ResponseEntity<>(e.getCause(),HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @GetMapping("test")
     public String getMethodName() {
-        sseController.pushEvent(1l, "Grading", 1, 10, LocalDateTime.now());
+        sseController.pushGradingProcess(1l, GradingStatusEnum.ERROR, LocalDateTime.now(), 1l);
         return "new String()";
     }
     
+    @PostMapping("/v2")
+    public ResponseEntity<?> gradingV2(@RequestBody CheckImportantRequest request) {
+
+        gradingService.gradingV2(request);
+
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
 
 }
