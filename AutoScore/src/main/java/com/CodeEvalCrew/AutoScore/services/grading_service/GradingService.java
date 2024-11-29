@@ -4,12 +4,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
-import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
+import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
@@ -34,7 +33,6 @@ public class GradingService implements IGradingService {
             IAutoscorePostmanService autoscorePostmanService,
             IPlagiarismDetectionService plagiarismDetectionService,
             SourceDetailRepository sourceDetailRepository,
-            IGradingService gradingService,
             IScoreService scoreService,
             GradingProcessRepository gradingProcessRepository,
             SSEController sseController) {
@@ -47,7 +45,7 @@ public class GradingService implements IGradingService {
     }
 
     @Override
-    public void gradingV2(@RequestBody CheckImportantRequest request) {
+    public void gradingV2(CheckImportantRequest request) {
         boolean flag;
         do {
             GradingProcess gradingProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(request.getExamPaperId()).get();
@@ -79,6 +77,23 @@ public class GradingService implements IGradingService {
                 flag = false;
             }
         } while (flag);
+    }
+
+    @Override
+    public void grading(CheckImportantRequest request) throws Exception, NotFoundException {
+        try {
+            System.out.println("--------- Check Important ---------");
+            List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
+            System.out.println("--------- Grading ---------");
+            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy(), request.getMemory_Megabyte(), request.getProcessors());
+            System.out.println("--------- Plagiarism Detection ---------");
+            plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
+            System.out.println("--------- Add Student Error To Score ---------");
+            scoreService.addStudentErrorToScore(request.getExamPaperId());
+            System.out.println("--------- Done ---------");
+        } catch (Exception | NotFoundException e) {
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), request.getExamPaperId());
+        }
     }
 
 }
