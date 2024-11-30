@@ -5,6 +5,6 @@ import java.util.List;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 
 public interface IAutoscorePostmanService {
-    List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int numberDeploy, Long memory_Megabyte, Long processors);
+    List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources, Long examPaperId, int numberDeploy);
 
 }

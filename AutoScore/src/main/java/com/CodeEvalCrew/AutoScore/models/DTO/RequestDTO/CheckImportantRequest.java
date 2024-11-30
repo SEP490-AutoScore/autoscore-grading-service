@@ -17,6 +17,5 @@ public class CheckImportantRequest {
     private String examType;
     private Long organizationId;
     private int numberDeploy;
-    private Long memory_Megabyte;
-    private Long processors;
+
 }

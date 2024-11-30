@@ -26,7 +26,9 @@ public class GradingController {
     @PostMapping("")
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
+
             gradingService.grading(request);
+
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
