@@ -1,10 +1,8 @@
 package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
-import java.nio.file.FileVisitResult;
+
 import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
