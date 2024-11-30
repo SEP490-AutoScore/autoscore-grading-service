@@ -2,8 +2,6 @@ package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -57,7 +55,6 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Score_Detail;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
 import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamPaperRepository;
-import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamQuestionRepository;
 import com.CodeEvalCrew.AutoScore.repositories.examdatabase_repository.IExamDatabaseRepository;
 import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.postman_for_grading.PostmanForGradingRepository;
@@ -114,8 +111,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private ScoreDetailRepository scoreDetailRepository;
     @Autowired
     private StudentRepository studentRepository;
-    @Autowired
-    private IExamQuestionRepository examQuestionRepository;
+   
     @Autowired
     private PostmanForGradingRepository postmanForGradingRepository;
     @Autowired
@@ -123,7 +119,37 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
-            Long examPaperId, int numberDeploy, Long memory_Megabyte, Long processors) {
+            Long examPaperId, int numberDeploy) {
+
+                PathUtil.getConfigMemoryProcessor();
+        // // Config memory and processor for deploying docker
+        // try {
+        // File configFile = new File(PathUtil.CONFIG_MEMORY_PROCESSOR);
+
+        // // Check conditions for memory_Megabyte and processors
+        // if (memory_Megabyte == 0 || processors == 0) {
+        // // Delete the .wslconfig file if it exists
+        // if (configFile.exists()) {
+        // Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
+        // System.out.println(".wslconfig file deleted due to zero memory or processors
+        // request.");
+        // }
+        // } else {
+        // // Delete the .wslconfig file if it exists and create a new one
+        // if (configFile.exists()) {
+        // Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
+        // }
+
+        // try (FileWriter writer = new FileWriter(PathUtil.CONFIG_MEMORY_PROCESSOR)) {
+        // writer.write("[wsl2]\n");
+        // writer.write("memory=" + memory_Megabyte + "MB\n");
+        // writer.write("processors=" + processors + "\n");
+        // System.out.println(".wslconfig file created with new configuration.");
+        // }
+        // }
+        // } catch (IOException e) {
+        // System.err.println("Error managing .wslconfig file: " + e.getMessage());
+        // }
 
         // Kiểm tra điều kiện `fileCollectionPostman` và `isComfirmFile`
         Optional<Exam_Paper> optionalExamPaper = examPaperRepository.findById(examPaperId);
@@ -154,34 +180,6 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             return null;
         }
 
-        // Config memory and processor for deploying docker
-        try {
-            File configFile = new File(PathUtil.CONFIG_MEMORY_PROCESSOR);
-
-            // Check conditions for memory_Megabyte and processors
-            if (memory_Megabyte == 0 || processors == 0) {
-                // Delete the .wslconfig file if it exists
-                if (configFile.exists()) {
-                    Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
-                    System.out.println(".wslconfig file deleted due to zero memory or processors request.");
-                }
-            } else {
-                // Delete the .wslconfig file if it exists and create a new one
-                if (configFile.exists()) {
-                    Files.delete(Path.of(PathUtil.CONFIG_MEMORY_PROCESSOR));
-                }
-
-                try (FileWriter writer = new FileWriter(PathUtil.CONFIG_MEMORY_PROCESSOR)) {
-                    writer.write("[wsl2]\n");
-                    writer.write("memory=" + memory_Megabyte + "MB\n");
-                    writer.write("processors=" + processors + "\n");
-                    System.out.println(".wslconfig file created with new configuration.");
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error managing .wslconfig file: " + e.getMessage());
-        }
-
         // Chạy Postman Collection và lấy kết quả
         String postmanResult = runPostmanCollection(examPaperId);
         if (postmanResult == null) {
@@ -203,7 +201,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         }
 
         deleteAndCreateDatabaseByExamPaperId(examPaperId);
-        deleteAllFilesAndFolders(PathUtil.DIRECTORY_PATH);
+        // deleteAllFilesAndFolders(PathUtil.DIRECTORY_PATH);
 
         processStudentSolutions(studentSources, examPaperId, numberDeploy);
 
@@ -340,63 +338,40 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         StringBuilder logBuilder = new StringBuilder();
 
         try {
-
-            Path studentDir = Paths.get(PathUtil.DIRECTORY_PATH, String.valueOf(studentId));
-            Files.createDirectories(studentDir);
-
+            // Truy vấn Postman Collection từ cơ sở dữ liệu
             Source_Detail sourceDetail = sourceDetailRepository.findById(sourceDetailId)
                     .orElseThrow(() -> new RuntimeException("Source_Detail not found with ID: " + sourceDetailId));
-
-            Path postmanFilePath = studentDir.resolve(studentId + ".json");
 
             byte[] postmanCollection = sourceDetail.getFileCollectionPostman();
             Objects.requireNonNull(postmanCollection,
                     "fileCollectionPostman is null for sourceDetailId: " + sourceDetailId);
-            Files.write(postmanFilePath, postmanCollection);
 
-            // wait file to create success
-            int waitTimeInSeconds = 10;
-            int intervalInMilliseconds = 500;
-            int waited = 0;
-            while (!Files.exists(postmanFilePath) && waited < waitTimeInSeconds * 1000) {
-                Thread.sleep(intervalInMilliseconds);
-                waited += intervalInMilliseconds;
-            }
+            // Tạo file tạm với tên dựa trên studentId
+            Path tempPostmanFile = Files.createTempFile(studentId.toString(), ".json");
+            Files.write(tempPostmanFile, postmanCollection);
 
-            if (!Files.exists(postmanFilePath)) {
-                throw new IOException("Failed to create Postman collection file within timeout.");
-            }
+            System.out.println("Temporary Postman Collection created at: " + tempPostmanFile);
 
-            System.out.println("Running Newman for studentId: " + studentId);
-
-            ProcessBuilder processBuilder = new ProcessBuilder(PathUtil.NEWMAN_CMD_PATH, "run",
-                    postmanFilePath.toString());
-
+            // Chạy Newman với file tạm
+            String newmanCmdPath = PathUtil.getNewmanCmdPath();
+            ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run", tempPostmanFile.toString());
             processBuilder.redirectErrorStream(true);
+
             Process process = processBuilder.start();
 
-            // name file to save output
-            Path outputFile = studentDir.resolve(studentId + ".txt");
-
-            try (
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream(), "UTF-8"));
-                    BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
-
+            // Đọc output từ Newman
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    writer.write(line);
-                    writer.newLine();
-
                     line = line.trim();
                     logBuilder.append(line).append("\n");
 
+                    // Phân tích log để trích xuất thông tin hàm và số test case thành công
                     if (line.startsWith("→")) {
                         if (currentFunction != null) {
                             functionResults.put(currentFunction, passCount);
                         }
-
-                        currentFunction = line.substring(2).trim(); // Get the function name after "→"
+                        currentFunction = line.substring(2).trim(); // Lấy tên hàm sau "→"
                         passCount = 0;
                     } else if (line.startsWith("√")) {
                         passCount++;
@@ -406,23 +381,128 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
                 if (currentFunction != null) {
                     functionResults.put(currentFunction, passCount);
                 }
-
             }
 
             int exitCode = process.waitFor();
             if (exitCode != 0) {
-                System.out.println("Newman execution failed with exit code: " + exitCode);
+                System.err.println("Newman execution failed with exit code: " + exitCode);
             } else {
                 System.out.println("Newman executed successfully.");
             }
+
+            // Xóa file tạm sau khi hoàn thành
+            Files.deleteIfExists(tempPostmanFile);
+            System.out.println("Temporary Postman Collection deleted.");
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // Return both function results and the log as a Pair
+        // Trả về kết quả kiểm tra
         return Pair.of(functionResults, logBuilder.toString());
     }
+
+    // private Pair<Map<String, Integer>, String> getAndRunPostmanCollection(Long
+    // studentId, Long sourceDetailId) {
+    // Map<String, Integer> functionResults = new HashMap<>();
+    // String currentFunction = null;
+    // int passCount = 0;
+    // StringBuilder logBuilder = new StringBuilder();
+
+    // try {
+
+    // Path studentDir = Paths.get(PathUtil.DIRECTORY_PATH,
+    // String.valueOf(studentId));
+    // Files.createDirectories(studentDir);
+
+    // Source_Detail sourceDetail = sourceDetailRepository.findById(sourceDetailId)
+    // .orElseThrow(() -> new RuntimeException("Source_Detail not found with ID: " +
+    // sourceDetailId));
+
+    // Path postmanFilePath = studentDir.resolve(studentId + ".json");
+
+    // byte[] postmanCollection = sourceDetail.getFileCollectionPostman();
+    // Objects.requireNonNull(postmanCollection,
+    // "fileCollectionPostman is null for sourceDetailId: " + sourceDetailId);
+    // Files.write(postmanFilePath, postmanCollection);
+
+    // // wait file to create success
+    // int waitTimeInSeconds = 10;
+    // int intervalInMilliseconds = 500;
+    // int waited = 0;
+    // while (!Files.exists(postmanFilePath) && waited < waitTimeInSeconds * 1000) {
+    // Thread.sleep(intervalInMilliseconds);
+    // waited += intervalInMilliseconds;
+    // }
+
+    // if (!Files.exists(postmanFilePath)) {
+    // throw new IOException("Failed to create Postman collection file within
+    // timeout.");
+    // }
+
+    // System.out.println("Running Newman for studentId: " + studentId);
+
+    // String newmanCmdPath = PathUtil.getNewmanCmdPath();
+
+    // ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run",
+    // postmanFilePath.toString());
+
+    // // ProcessBuilder processBuilder = new
+    // ProcessBuilder(PathUtil.NEWMAN_CMD_PATH, "run",
+    // // postmanFilePath.toString());
+
+    // processBuilder.redirectErrorStream(true);
+    // Process process = processBuilder.start();
+
+    // // name file to save output
+    // Path outputFile = studentDir.resolve(studentId + ".txt");
+
+    // try (
+    // BufferedReader reader = new BufferedReader(
+    // new InputStreamReader(process.getInputStream(), "UTF-8"));
+    // BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
+
+    // String line;
+    // while ((line = reader.readLine()) != null) {
+    // writer.write(line);
+    // writer.newLine();
+
+    // line = line.trim();
+    // logBuilder.append(line).append("\n");
+
+    // if (line.startsWith("→")) {
+    // if (currentFunction != null) {
+    // functionResults.put(currentFunction, passCount);
+    // }
+
+    // currentFunction = line.substring(2).trim(); // Get the function name after
+    // "→"
+    // passCount = 0;
+    // } else if (line.startsWith("√")) {
+    // passCount++;
+    // }
+    // }
+
+    // if (currentFunction != null) {
+    // functionResults.put(currentFunction, passCount);
+    // }
+
+    // }
+
+    // int exitCode = process.waitFor();
+    // if (exitCode != 0) {
+    // System.out.println("Newman execution failed with exit code: " + exitCode);
+    // } else {
+    // System.out.println("Newman executed successfully.");
+    // }
+
+    // } catch (Exception e) {
+    // e.printStackTrace();
+    // }
+
+    // // Return both function results and the log as a Pair
+    // return Pair.of(functionResults, logBuilder.toString());
+    // }
 
     public void saveScoreAndScoreDetail(Long studentId, Long examPaperId,
             Map<String, Long> functionPassedCountMap, String logBuilder) {
@@ -442,15 +522,14 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         // score.setExamPaper(examPaper);
         // score.setGradedAt(LocalDateTime.now());
         Score score = scoreRepository.findByStudentIdAndExamPaperId(studentId, examPaperId);
-               
+
         if (score == null) {
             score = new Score();
             score.setStudent(student);
             score.setExamPaper(examPaper);
             score.setGradedAt(LocalDateTime.now());
-        }
-        else {
-           //delete score detail
+        } else {
+            // delete score detail
             score.getScoreDetails().clear();
             scoreRepository.save(score); // Ghi lại để Hibernate xóa các orphans
         }
@@ -513,7 +592,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             // Lưu scoreDetail vào database
             scoreDetailRepository.save(scoreDetail);
-            
+
             System.out.println("Saved score detail for function " + postmanFunction.getPostmanFunctionName()
                     + ", scoreAchieve: " + scoreAchieve);
             reasonBuilder.append("Saved score detail for function ")
@@ -687,9 +766,11 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         String databaseName = examDatabaseRepository.findDatabaseNameByExamPaperId(examPaperId);
         if (rootNode.has("ConnectionStrings")) {
             ObjectNode connectionStringsNode = (ObjectNode) rootNode.get("ConnectionStrings");
+            String dbServer = PathUtil.getDbServer();
             connectionStringsNode.fieldNames().forEachRemaining(key -> {
                 connectionStringsNode.put(key, String.join(";",
-                        "Server=" + PathUtil.DB_SERVER,
+                        // "Server=" + PathUtil.DB_SERVER,
+                        "Server=" + dbServer,
                         "uid=" + PathUtil.DB_UID,
                         "pwd=" + PathUtil.DB_PWD,
                         "database=" + databaseName,
@@ -895,29 +976,72 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     // Phương thức khởi động Docker và kiểm tra trạng thái
     public boolean startDocker() {
         try {
+            // Lấy đường dẫn Docker Desktop
+            String dockerDesktopPath = PathUtil.getDockerDesktopPath();
 
+            // Khởi động Docker Desktop
             Process process = new ProcessBuilder(
-                    "cmd.exe", "/c", "start", "\"\"", "\"" + PathUtil.DOCKER_DESKTOP_PATH + "\"").start();
+                    "cmd.exe", "/c", "start", "\"\"", "\"" + dockerDesktopPath + "\"").start();
 
-            // Đợi một vài giây cho Docker khởi động
-            Thread.sleep(10000);
+            // Đợi Docker khởi động và kiểm tra trạng thái
+            int waitTimeInSeconds = 120;
+            int intervalInMilliseconds = 2000;
+            int waited = 0;
 
-            // Kiểm tra trạng thái Docker bằng lệnh 'docker info'
-            Process checkProcess = new ProcessBuilder("docker", "info").start();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(checkProcess.getInputStream()));
-            String line;
-            StringBuilder output = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+            while (waited < waitTimeInSeconds * 1000) {
+                // Kiểm tra trạng thái Docker bằng lệnh 'docker info'
+                Process checkProcess = new ProcessBuilder("docker", "info").start();
+                int exitCode = checkProcess.waitFor();
+
+                if (exitCode == 0) {
+                    System.out.println("Docker is running.");
+                    return true; // Docker đã khởi động thành công
+                }
+
+                // Đợi 1 giây trước khi thử lại
+                Thread.sleep(intervalInMilliseconds);
+                waited += intervalInMilliseconds;
             }
 
-            checkProcess.waitFor();
-            return checkProcess.exitValue() == 0;
+            System.out.println("Docker failed to start within the timeout period.");
+            return false; // Docker không khởi động trong thời gian cho phép
+
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
-            return false;
+            return false; // Xảy ra lỗi trong quá trình khởi động Docker
         }
     }
+
+    // public boolean startDocker() {
+    // try {
+    // String dockerDesktopPath = PathUtil.getDockerDesktopPath();
+
+    // // Process process = new ProcessBuilder(
+    // // "cmd.exe", "/c", "start", "\"\"", "\"" + PathUtil.DOCKER_DESKTOP_PATH +
+    // "\"").start();
+    // Process process = new ProcessBuilder(
+    // "cmd.exe", "/c", "start", "\"\"", "\"" + dockerDesktopPath + "\"").start();
+
+    // // Đợi một vài giây cho Docker khởi động
+    // Thread.sleep(10000);
+
+    // // Kiểm tra trạng thái Docker bằng lệnh 'docker info'
+    // Process checkProcess = new ProcessBuilder("docker", "info").start();
+    // BufferedReader reader = new BufferedReader(new
+    // InputStreamReader(checkProcess.getInputStream()));
+    // String line;
+    // StringBuilder output = new StringBuilder();
+    // while ((line = reader.readLine()) != null) {
+    // output.append(line).append("\n");
+    // }
+
+    // checkProcess.waitFor();
+    // return checkProcess.exitValue() == 0;
+    // } catch (IOException | InterruptedException e) {
+    // e.printStackTrace();
+    // return false;
+    // }
+    // }
 
     private String runPostmanCollection(Long examPaperId) {
         Exam_Paper examPaper = examPaperRepository.findById(examPaperId).orElse(null);
@@ -934,10 +1058,15 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
             Files.write(tempFile, examPaper.getFileCollectionPostman(), StandardOpenOption.WRITE);
 
-            ProcessBuilder processBuilder = new ProcessBuilder(
-                    PathUtil.NEWMAN_CMD_PATH,
-                    "run",
+            String newmanCmdPath = PathUtil.getNewmanCmdPath();
+
+            ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run",
                     tempFile.toAbsolutePath().toString());
+
+            // ProcessBuilder processBuilder = new ProcessBuilder(
+            // PathUtil.NEWMAN_CMD_PATH,
+            // "run",
+            // tempFile.toAbsolutePath().toString());
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
