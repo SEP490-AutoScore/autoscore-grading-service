@@ -53,7 +53,7 @@ public class GradingService implements IGradingService {
                 System.out.println("--------- Check Important ---------");
                 List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
                 System.out.println("--------- Grading ---------");
-                List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy(), request.getMemory_Megabyte(), request.getProcessors());
+                List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
                 System.out.println("--------- Plagiarism Detection ---------");
                 plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
                 System.out.println("--------- Add Student Error To Score ---------");
@@ -85,7 +85,7 @@ public class GradingService implements IGradingService {
             System.out.println("--------- Check Important ---------");
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
             System.out.println("--------- Grading ---------");
-            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId(), request.getNumberDeploy(), request.getMemory_Megabyte(), request.getProcessors());
+            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
             System.out.println("--------- Plagiarism Detection ---------");
             plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
             System.out.println("--------- Add Student Error To Score ---------");

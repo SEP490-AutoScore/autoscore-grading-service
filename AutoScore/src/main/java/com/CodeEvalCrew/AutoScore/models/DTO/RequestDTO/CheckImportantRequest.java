@@ -16,6 +16,4 @@ public class CheckImportantRequest {
     private Long examPaperId;
     private String examType;
     private Long organizationId;
-    private int numberDeploy;
-
 }
