@@ -22,9 +22,12 @@ public class PathUtil {
     // Docker
     public static final String DOCKER_DESKTOP_PATH = "AUTOMATIC";
     public static final int NUMBER_DEPLOY = 2;
-    public static final String MEMORY_MEGA_BYTE = "4096";
+       // public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
+    public static final String CONFIG_MEMORY_PROCESSOR = "";
+
+    public static final String MEMORY_MEGA_BYTE = "3072";
     public static final String PROCESSORS = "4";
-    public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
+ 
     public static final String PATH_FILE_CONFIG = "AUTOMATIC";
 
     // Newman
