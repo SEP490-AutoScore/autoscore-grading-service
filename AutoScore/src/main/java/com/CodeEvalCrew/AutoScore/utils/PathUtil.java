@@ -21,6 +21,8 @@ public class PathUtil {
 
     // Docker
     public static final String DOCKER_DESKTOP_PATH = "AUTOMATIC";
+    public static final String DOCKER_HOST = "tcp://localhost:2375";
+    
     public static final int NUMBER_DEPLOY = 2;
        // public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
     public static final String CONFIG_MEMORY_PROCESSOR = "";

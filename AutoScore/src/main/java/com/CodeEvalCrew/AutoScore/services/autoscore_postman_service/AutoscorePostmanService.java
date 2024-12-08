@@ -1,6 +1,15 @@
 package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
@@ -14,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,13 +36,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import java.io.*;
-import com.google.gson.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +77,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonReader;
 
 @Service
@@ -847,7 +851,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     }
 
     public void deleteContainerAndImages() throws IOException {
-        DockerClient dockerClient = DockerClientBuilder.getInstance("tcp://localhost:2375")
+        DockerClient dockerClient = DockerClientBuilder.getInstance(PathUtil.DOCKER_HOST)
                 .withDockerCmdExecFactory(new OkHttpDockerCmdExecFactory())
                 .build();
 
