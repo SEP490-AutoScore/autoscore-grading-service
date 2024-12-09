@@ -13,9 +13,11 @@ import java.util.regex.Pattern;
 public class PathUtil {
 
     // Sql server
-    public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    // public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    public static final String DB_URL = "jdbc:sqlserver://ADMIN-PC\\SQLEXPRESS;databaseName=master;user=sa;password=1234567890;encrypt=false;trustServerCertificate=true;";
     public static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
+    // public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
+        public static final String DB_SERVER = "AUTOMATIC\\SQLEXPRESS";
     public static final String DB_UID = "sa";
     public static final String DB_PWD = "123456";
 
