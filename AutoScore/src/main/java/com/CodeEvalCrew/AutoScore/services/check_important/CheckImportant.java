@@ -86,10 +86,12 @@ public class CheckImportant implements ICheckImportant{
             }
 
             result = utils.getImportantToCheck(importants, students, examPaper);
+            
             Optional<GradingProcess> optionalProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(examPaper.getExamPaperId());
             if (!optionalProcess.isPresent()) {
                 throw new NoSuchElementException("process not found");
             }
+
             GradingProcess gp = optionalProcess.get();
             gp.setStatus(GradingStatusEnum.GRADING);
             sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), request.getExamPaperId());

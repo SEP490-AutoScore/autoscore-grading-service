@@ -13,7 +13,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 @RestController
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "http://localhost:5173/")
 public class SSEController {
 // Tạo Sink để lưu trữ các sự kiện
     private final Sinks.Many<String> sink = Sinks.many().multicast().onBackpressureBuffer();
