@@ -13,18 +13,25 @@ import java.util.regex.Pattern;
 public class PathUtil {
 
     // Sql server
-    public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    // public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    public static final String DB_URL = "jdbc:sqlserver://ADMIN-PC\\SQLEXPRESS;databaseName=master;user=sa;password=1234567890;encrypt=false;trustServerCertificate=true;";
     public static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
+    // public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
+        public static final String DB_SERVER = "AUTOMATIC\\SQLEXPRESS";
     public static final String DB_UID = "sa";
     public static final String DB_PWD = "123456";
 
     // Docker
     public static final String DOCKER_DESKTOP_PATH = "AUTOMATIC";
+    public static final String DOCKER_HOST = "tcp://localhost:2375";
+    
     public static final int NUMBER_DEPLOY = 2;
-    public static final String MEMORY_MEGA_BYTE = "4096";
+       // public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
+    public static final String CONFIG_MEMORY_PROCESSOR = "";
+
+    public static final String MEMORY_MEGA_BYTE = "3072";
     public static final String PROCESSORS = "4";
-    public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
+ 
     public static final String PATH_FILE_CONFIG = "AUTOMATIC";
 
     // Newman
