@@ -10,38 +10,83 @@ import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+
+@Component
 public class PathUtil {
 
-    // Sql server
-    // public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
-    public static final String DB_URL = "jdbc:sqlserver://ADMIN-PC\\SQLEXPRESS;databaseName=master;user=sa;password=1234567890;encrypt=false;trustServerCertificate=true;";
-    public static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-    // public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
-        public static final String DB_SERVER = "AUTOMATIC\\SQLEXPRESS";
-    public static final String DB_UID = "sa";
-    public static final String DB_PWD = "123456";
 
-    // Docker
-    public static final String DOCKER_DESKTOP_PATH = "AUTOMATIC";
-    public static final String DOCKER_HOST = "tcp://localhost:2375";
+        @Value("${db.url}")
+    public String dbUrl;
+
+    @Value("${db.driver}")
+    public String dbDriver;
+
+    @Value("${db.server}")
+    public String dbServer;
+
+    @Value("${db.uid}")
+    public String dbUid;
+
+    @Value("${db.pwd}")
+    public String dbPwd;
+
+    @Value("${docker.desktop.path}")
+    public String dockerDesktopPath;
+
+    @Value("${docker.host}")
+    public String dockerHost;
+
+    @Value("${config.memory.processor}")
+    public String configMemoryProcessor;
+
+    @Value("${memory.mega.byte}")
+    public String memoryMegaByte;
+
+    @Value("${processors}")
+    public String processors;
+
+    @Value("${path.file.config}")
+    public String pathFileConfig;
+
+    @Value("${newman.cmd.path}")
+    public String newmanCmdPath;
+
+    @Value("${base.port}")
+    public int basePort;
+
+    // // Sql server
+    // // public static final String DB_URL = "jdbc:sqlserver://MSI\\SQLSERVER;databaseName=master;user=sa;password=123456;encrypt=false;trustServerCertificate=true;";
+    // public static final String DB_URL = "jdbc:sqlserver://ADMIN-PC\\SQLEXPRESS;databaseName=master;user=sa;password=1234567890;encrypt=false;trustServerCertificate=true;";
+    // public static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+    // // public static final String DB_SERVER = "AUTOMATIC\\SQLSERVER";
+    //     public static final String DB_SERVER = "AUTOMATIC\\SQLEXPRESS";
+    // public static final String DB_UID = "sa";
+    // public static final String DB_PWD = "123456";
+
+    // // Docker
+    // public static final String DOCKER_DESKTOP_PATH = "AUTOMATIC";
+    // public static final String DOCKER_HOST = "tcp://localhost:2375";
     
-    public static final int NUMBER_DEPLOY = 2;
-       // public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
-    public static final String CONFIG_MEMORY_PROCESSOR = "";
+    // public static final int NUMBER_DEPLOY = 2;
+    //    // public static final String CONFIG_MEMORY_PROCESSOR = "AUTOMATIC";
+    // public static final String CONFIG_MEMORY_PROCESSOR = "";
 
-    public static final String MEMORY_MEGA_BYTE = "3072";
-    public static final String PROCESSORS = "4";
+    // public static final String MEMORY_MEGA_BYTE = "3072";
+    // public static final String PROCESSORS = "4";
  
-    public static final String PATH_FILE_CONFIG = "AUTOMATIC";
+    // public static final String PATH_FILE_CONFIG = "AUTOMATIC";
 
-    // Newman
-    public static final String NEWMAN_CMD_PATH = "AUTOMATIC";
+    // // Newman
+    // public static final String NEWMAN_CMD_PATH = "AUTOMATIC";
 
-    public static final int BASE_PORT = 10000;
+    // public static final int BASE_PORT = 10000;
 
-    public static String getNewmanCmdPath() {
-        if (!"AUTOMATIC".equalsIgnoreCase(NEWMAN_CMD_PATH)) {
-            return NEWMAN_CMD_PATH;
+    public String getNewmanCmdPath() {
+        if (!"AUTOMATIC".equalsIgnoreCase(newmanCmdPath)) {
+            return newmanCmdPath;
         }
         try {
             Process process = new ProcessBuilder("where", "newman").start();
@@ -56,12 +101,12 @@ public class PathUtil {
             System.err.println("Error while trying to locate newman: " + e.getMessage());
         }
 
-        return NEWMAN_CMD_PATH;
+        return newmanCmdPath;
     }
 
-    public static String getDbServer() {
-        if (!DB_SERVER.startsWith("AUTOMATIC")) {
-            return DB_SERVER;
+    public String getDbServer() {
+        if (!dbServer.startsWith("AUTOMATIC")) {
+            return dbServer;
         }
         try {
             Process process = new ProcessBuilder("ipconfig").start();
@@ -100,7 +145,7 @@ public class PathUtil {
             String ipAddress = ethernetIp != null ? ethernetIp : wifiIp;
 
             if (ipAddress != null) {
-                String suffix = DB_SERVER.substring("AUTOMATIC".length());
+                String suffix = dbServer.substring("AUTOMATIC".length());
                 return ipAddress + suffix;
             } else {
                 throw new RuntimeException("Could not determine IP address for DB_SERVER.");
@@ -111,9 +156,9 @@ public class PathUtil {
         }
     }
 
-    public static String getDockerDesktopPath() {
-        if (!"AUTOMATIC".equals(DOCKER_DESKTOP_PATH)) {
-            return DOCKER_DESKTOP_PATH;
+    public String getDockerDesktopPath() {
+        if (!"AUTOMATIC".equals(dockerDesktopPath)) {
+            return dockerDesktopPath;
         }
 
         String[] commonPaths = {
@@ -131,8 +176,8 @@ public class PathUtil {
         throw new RuntimeException("Docker Desktop.exe not found in default locations.");
     }
 
-    public static String getConfigFilePath() {
-        String configFilePath = PATH_FILE_CONFIG;
+    public String getConfigFilePath() {
+        String configFilePath = pathFileConfig;
 
         if (configFilePath.equals("AUTOMATIC")) {
             configFilePath = System.getProperty("user.home") + File.separator + ".wslconfig";
@@ -144,11 +189,11 @@ public class PathUtil {
         return configFilePath;
     }
 
-    public static void getConfigMemoryProcessor() {
+    public void getConfigMemoryProcessor() {
 
         String configFilePath = getConfigFilePath();
 
-        if (CONFIG_MEMORY_PROCESSOR.equals("AUTOMATIC")) {
+        if (configMemoryProcessor.equals("AUTOMATIC")) {
 
             try {
                 File configFile = new File(configFilePath);
@@ -159,7 +204,7 @@ public class PathUtil {
             } catch (IOException e) {
                 System.err.println("Error while deleting the config file: " + e.getMessage());
             }
-        } else if (CONFIG_MEMORY_PROCESSOR.isEmpty()) {
+        } else if (configMemoryProcessor.isEmpty()) {
 
             try {
                 File configFile = new File(configFilePath);
@@ -170,8 +215,8 @@ public class PathUtil {
 
                 try (FileWriter writer = new FileWriter(configFile)) {
                     writer.write("[wsl2]\n");
-                    writer.write("memory=" + MEMORY_MEGA_BYTE + "MB\n");
-                    writer.write("processors=" + PROCESSORS + "\n");
+                    writer.write("memory=" + memoryMegaByte + "MB\n");
+                    writer.write("processors=" + processors + "\n");
                     System.out.println(".wslconfig file created/updated with new configuration.");
                 }
             } catch (IOException e) {

@@ -39,6 +39,7 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.CodeEvalCrew.AutoScore.controllers.SSEController;
@@ -83,6 +84,27 @@ import com.google.gson.stream.JsonReader;
 @Service
 public class AutoscorePostmanService implements IAutoscorePostmanService {
 
+    @Value("${number.deploy}")
+    private int numberDeploy;
+
+    @Value("${base.port}")
+    private int basePort;
+
+    @Value("${db.uid}")
+    private String dbUid;
+
+    @Value("${db.pwd}")
+    private String dbPwd;
+
+    @Value("${db.driver}")
+    private String dbDriver;
+
+    @Value("${db.url}")
+    private String dbUrl;
+
+    @Value("${docker.host}")
+    private String dockerHost;
+
     @Autowired
     private GradingProcessRepository gradingProcessRepository;
     @Autowired
@@ -101,13 +123,15 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private PostmanForGradingRepository postmanForGradingRepository;
     @Autowired
     private SSEController sseController;
+    @Autowired
+private PathUtil PathUtil;
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
             Long examPaperId) {
 
         PathUtil.getConfigMemoryProcessor();
-        int numberDeploy = PathUtil.NUMBER_DEPLOY;
+        // int numberDeploy = PathUtil.NUMBER_DEPLOY;
 
         Optional<Exam_Paper> optionalExamPaper = examPaperRepository.findById(examPaperId);
         if (optionalExamPaper.isEmpty()) {
@@ -197,7 +221,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             for (int i = 0; i < currentBatch.size(); i++) {
                 StudentSourceInfoDTO studentSource = currentBatch.get(i);
                 Path dirPath = Paths.get(studentSource.getStudentSourceCodePath());
-                int port = PathUtil.BASE_PORT + i;
+                int port = basePort + i;
                 Long studentId = studentSource.getStudentId();
 
                 createFileCollectionPostman(examPaperId, studentSource.getSourceDetailId(), port);
@@ -707,8 +731,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             for (Map.Entry<String, JsonElement> entry : connectionStringsObject.entrySet()) {
                 connectionStringsObject.addProperty(entry.getKey(), String.join(";",
                         "Server=" + dbServer,
-                        "uid=" + PathUtil.DB_UID,
-                        "pwd=" + PathUtil.DB_PWD,
+                        "uid=" + dbUid,
+                        "pwd=" + dbPwd,
                         "database=" + databaseName,
                         "TrustServerCertificate=True"));
             }
@@ -801,8 +825,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
 
     private void deleteAndCreateDatabaseByExamPaperId(Long examPaperId) {
         try {
-            Class.forName(PathUtil.DB_DRIVER);
-            try (Connection connection = DriverManager.getConnection(PathUtil.DB_URL);
+            Class.forName(dbDriver);
+            try (Connection connection = DriverManager.getConnection(dbUrl);
                     Statement statement = connection.createStatement()) {
 
                 String databaseName = examDatabaseRepository.findDatabaseNameByExamPaperId(examPaperId);
@@ -851,7 +875,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     }
 
     public void deleteContainerAndImages() throws IOException {
-        DockerClient dockerClient = DockerClientBuilder.getInstance(PathUtil.DOCKER_HOST)
+        DockerClient dockerClient = DockerClientBuilder.getInstance(dockerHost)
                 .withDockerCmdExecFactory(new OkHttpDockerCmdExecFactory())
                 .build();
 
