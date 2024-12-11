@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import com.CodeEvalCrew.AutoScore.controllers.SSEController;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Type_Enum;
+import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.NGram;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
@@ -71,8 +72,8 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
                 throw new NoSuchElementException("process not found");
             }
             GradingProcess gp = optionalProcess.get();
-            gp.setStatus("Check plagiarism");
-            sseController.pushEvent(gp.getProcessId(), "Check plagiarism", gp.getSuccessProcess(), gp.getTotalProcess(), gp.getStartDate());
+            gp.setStatus(GradingStatusEnum.PLAGIARISM);
+            sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), examPaperId);
             gradingProcessRepository.save(gp);
             System.out.println("Starting plagiarism detection for " + sourceDetailsDTO.size() + " source details.");
 
@@ -115,8 +116,8 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             finalCheckPlagiarismService.finalCheckPlagiarism(examPaperId);
 
             executorService.shutdown();
-            gp.setStatus("Done");
-            sseController.pushEvent(gp.getProcessId(), "Done", gp.getSuccessProcess(), gp.getTotalProcess(), gp.getStartDate());
+            gp.setStatus(GradingStatusEnum.DONE);
+            sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), examPaperId);
             gradingProcessRepository.save(gp);
             System.gc();
             System.out.println("Plagiarism detection completed for all students.");
