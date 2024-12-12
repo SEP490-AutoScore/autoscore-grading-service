@@ -34,6 +34,8 @@ public class Postman_For_Grading {
 
     private Float scoreOfFunction;
 
+    private Float scorePercentage;
+
     private Long totalPmTest;
 
     private boolean status;

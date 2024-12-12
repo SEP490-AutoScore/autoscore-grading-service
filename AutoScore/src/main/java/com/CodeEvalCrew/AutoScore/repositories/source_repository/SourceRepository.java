@@ -10,6 +10,4 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Source;
 @Repository
 public interface SourceRepository extends JpaRepository<Source, Long> {
     Optional<Source> findByExamPaper_ExamPaperId(Long examPaperId);
-    
-
 }
