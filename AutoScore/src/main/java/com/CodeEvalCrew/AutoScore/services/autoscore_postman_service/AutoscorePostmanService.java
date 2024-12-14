@@ -1,6 +1,5 @@
 package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -124,7 +123,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     @Autowired
     private SSEController sseController;
     @Autowired
-private PathUtil PathUtil;
+    private PathUtil PathUtil;
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
@@ -331,6 +330,7 @@ private PathUtil PathUtil;
             Files.write(tempPostmanFile, postmanCollection);
 
             System.out.println("Temporary Postman Collection created at: " + tempPostmanFile);
+            System.out.println("Running Newman for studentId: " + studentId);
 
             String newmanCmdPath = PathUtil.getNewmanCmdPath();
             ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run", tempPostmanFile.toString());
@@ -504,6 +504,7 @@ private PathUtil PathUtil;
             score.getScoreDetails().clear();
             scoreRepository.save(score);
         }
+        score.setLogRunPostman(null);
         score.setLogRunPostman(logBuilder.toString());
         scoreRepository.save(score);
 
@@ -738,10 +739,19 @@ private PathUtil PathUtil;
             }
         }
 
+        // try (Writer writer = Files.newBufferedWriter(filePath,
+        // StandardCharsets.UTF_8)) {
+        // Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        // gson.toJson(rootObject, writer);
+        // }
         try (Writer writer = Files.newBufferedWriter(filePath, StandardCharsets.UTF_8)) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Gson gson = new GsonBuilder()
+                    .setPrettyPrinting()
+                    .disableHtmlEscaping() // Tắt mã hóa ký tự đặc biệt
+                    .create();
             gson.toJson(rootObject, writer);
         }
+
     }
 
     // public void updateAppsettingsJson(Path filePath, Long examPaperId, int port)
@@ -924,8 +934,11 @@ private PathUtil PathUtil;
         }
 
         try {
+            // Convert byte[] to String with UTF-8
+            String fileCollectionString = new String(fileCollection, StandardCharsets.UTF_8);
+
             ObjectMapper objectMapper = new ObjectMapper();
-            ObjectNode rootNode = (ObjectNode) objectMapper.readTree(fileCollection);
+            ObjectNode rootNode = (ObjectNode) objectMapper.readTree(fileCollectionString);
             ArrayNode items = (ArrayNode) rootNode.get("item");
 
             for (int i = 0; i < items.size(); i++) {
@@ -1179,31 +1192,4 @@ private PathUtil PathUtil;
         Files.deleteIfExists(dirPath.resolve("docker-compose.yml"));
     }
 
-    // public static void deleteAllFilesAndFolders(String directoryPath) {
-    //     Path directory = Paths.get(directoryPath);
-
-    //     try {
-    //         Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-    //             @Override
-    //             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-
-    //                 Files.delete(file);
-    //                 System.out.println("Deleted file: " + file);
-    //                 return FileVisitResult.CONTINUE;
-    //             }
-
-    //             @Override
-    //             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-
-    //                 Files.delete(dir);
-    //                 System.out.println("Deleted directory: " + dir);
-    //                 return FileVisitResult.CONTINUE;
-    //             }
-    //         });
-
-    //         System.out.println("All files and folders deleted successfully.");
-    //     } catch (IOException e) {
-    //         System.err.println("Error while deleting files and folders: " + e.getMessage());
-    //     }
-    // }
 }
