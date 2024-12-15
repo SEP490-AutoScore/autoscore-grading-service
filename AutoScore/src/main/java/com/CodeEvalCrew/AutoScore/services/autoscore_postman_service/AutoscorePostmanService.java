@@ -498,12 +498,13 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
             score = new Score();
             score.setStudent(student);
             score.setExamPaper(examPaper);
-            score.setGradedAt(LocalDateTime.now());
+            
 
         } else {
             score.getScoreDetails().clear();
             scoreRepository.save(score);
         }
+        score.setGradedAt(LocalDateTime.now());
         score.setLogRunPostman(null);
         score.setLogRunPostman(logBuilder.toString());
         scoreRepository.save(score);
