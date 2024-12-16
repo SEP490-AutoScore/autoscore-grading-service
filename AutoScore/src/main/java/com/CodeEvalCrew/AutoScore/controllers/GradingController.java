@@ -26,9 +26,7 @@ public class GradingController {
     @PostMapping("")
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
-
             gradingService.grading(request);
-
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
@@ -39,10 +37,13 @@ public class GradingController {
     
     @PostMapping("/v2")
     public ResponseEntity<?> gradingV2(@RequestBody CheckImportantRequest request) {
+        try{
+            gradingService.gradingV2(request);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getCause(),HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
-        gradingService.gradingV2(request);
-
-        return new ResponseEntity<>(HttpStatus.OK);
     }
 
 }

@@ -1,6 +1,5 @@
 package com.CodeEvalCrew.AutoScore.services.autoscore_postman_service;
 
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -124,7 +123,7 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     @Autowired
     private SSEController sseController;
     @Autowired
-private PathUtil PathUtil;
+    private PathUtil PathUtil;
 
     @Override
     public List<StudentSourceInfoDTO> gradingFunction(List<StudentSourceInfoDTO> studentSources,
@@ -331,6 +330,7 @@ private PathUtil PathUtil;
             Files.write(tempPostmanFile, postmanCollection);
 
             System.out.println("Temporary Postman Collection created at: " + tempPostmanFile);
+            System.out.println("Running Newman for studentId: " + studentId);
 
             String newmanCmdPath = PathUtil.getNewmanCmdPath();
             ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run", tempPostmanFile.toString());
@@ -378,108 +378,6 @@ private PathUtil PathUtil;
         return Pair.of(functionResults, logBuilder.toString());
     }
 
-    // private Pair<Map<String, Integer>, String> getAndRunPostmanCollection(Long
-    // studentId, Long sourceDetailId) {
-    // Map<String, Integer> functionResults = new HashMap<>();
-    // String currentFunction = null;
-    // int passCount = 0;
-    // StringBuilder logBuilder = new StringBuilder();
-
-    // try {
-
-    // Path studentDir = Paths.get(PathUtil.DIRECTORY_PATH,
-    // String.valueOf(studentId));
-    // Files.createDirectories(studentDir);
-
-    // Source_Detail sourceDetail = sourceDetailRepository.findById(sourceDetailId)
-    // .orElseThrow(() -> new RuntimeException("Source_Detail not found with ID: " +
-    // sourceDetailId));
-
-    // Path postmanFilePath = studentDir.resolve(studentId + ".json");
-
-    // byte[] postmanCollection = sourceDetail.getFileCollectionPostman();
-    // Objects.requireNonNull(postmanCollection,
-    // "fileCollectionPostman is null for sourceDetailId: " + sourceDetailId);
-    // Files.write(postmanFilePath, postmanCollection);
-
-    // // wait file to create success
-    // int waitTimeInSeconds = 10;
-    // int intervalInMilliseconds = 500;
-    // int waited = 0;
-    // while (!Files.exists(postmanFilePath) && waited < waitTimeInSeconds * 1000) {
-    // Thread.sleep(intervalInMilliseconds);
-    // waited += intervalInMilliseconds;
-    // }
-
-    // if (!Files.exists(postmanFilePath)) {
-    // throw new IOException("Failed to create Postman collection file within
-    // timeout.");
-    // }
-
-    // System.out.println("Running Newman for studentId: " + studentId);
-
-    // String newmanCmdPath = PathUtil.getNewmanCmdPath();
-
-    // ProcessBuilder processBuilder = new ProcessBuilder(newmanCmdPath, "run",
-    // postmanFilePath.toString());
-
-    // // ProcessBuilder processBuilder = new
-    // ProcessBuilder(PathUtil.NEWMAN_CMD_PATH, "run",
-    // // postmanFilePath.toString());
-
-    // processBuilder.redirectErrorStream(true);
-    // Process process = processBuilder.start();
-
-    // // name file to save output
-    // Path outputFile = studentDir.resolve(studentId + ".txt");
-
-    // try (
-    // BufferedReader reader = new BufferedReader(
-    // new InputStreamReader(process.getInputStream(), "UTF-8"));
-    // BufferedWriter writer = Files.newBufferedWriter(outputFile)) {
-
-    // String line;
-    // while ((line = reader.readLine()) != null) {
-    // writer.write(line);
-    // writer.newLine();
-
-    // line = line.trim();
-    // logBuilder.append(line).append("\n");
-
-    // if (line.startsWith("→")) {
-    // if (currentFunction != null) {
-    // functionResults.put(currentFunction, passCount);
-    // }
-
-    // currentFunction = line.substring(2).trim(); // Get the function name after
-    // "→"
-    // passCount = 0;
-    // } else if (line.startsWith("√")) {
-    // passCount++;
-    // }
-    // }
-
-    // if (currentFunction != null) {
-    // functionResults.put(currentFunction, passCount);
-    // }
-
-    // }
-
-    // int exitCode = process.waitFor();
-    // if (exitCode != 0) {
-    // System.out.println("Newman execution failed with exit code: " + exitCode);
-    // } else {
-    // System.out.println("Newman executed successfully.");
-    // }
-
-    // } catch (Exception e) {
-    // e.printStackTrace();
-    // }
-
-    // // Return both function results and the log as a Pair
-    // return Pair.of(functionResults, logBuilder.toString());
-    // }
-
     public void saveScoreAndScoreDetail(Long studentId, Long examPaperId,
             Map<String, Long> functionPassedCountMap, String logBuilder) {
         Student student = studentRepository.findById(studentId).orElse(null);
@@ -504,6 +402,7 @@ private PathUtil PathUtil;
             score.getScoreDetails().clear();
             scoreRepository.save(score);
         }
+        score.setLogRunPostman(null);
         score.setLogRunPostman(logBuilder.toString());
         scoreRepository.save(score);
 
@@ -739,54 +638,14 @@ private PathUtil PathUtil;
         }
 
         try (Writer writer = Files.newBufferedWriter(filePath, StandardCharsets.UTF_8)) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            Gson gson = new GsonBuilder()
+                    .setPrettyPrinting()
+                    .disableHtmlEscaping() // Turn off special character encoding
+                    .create();
             gson.toJson(rootObject, writer);
         }
+
     }
-
-    // public void updateAppsettingsJson(Path filePath, Long examPaperId, int port)
-    // throws IOException {
-
-    // String content = Files.readString(filePath, StandardCharsets.UTF_8);
-    // ObjectMapper objectMapper = new ObjectMapper();
-    // ObjectNode rootNode = (ObjectNode) objectMapper.readTree(content);
-
-    // if (!rootNode.has("Kestrel")) {
-    // ObjectNode kestrelNode = objectMapper.createObjectNode();
-    // ObjectNode endpointsNode = objectMapper.createObjectNode();
-    // ObjectNode httpNode = objectMapper.createObjectNode();
-    // httpNode.put("Url", "http://*:" + port);
-    // endpointsNode.set("Http", httpNode);
-    // kestrelNode.set("Endpoints", endpointsNode);
-    // rootNode.set("Kestrel", kestrelNode);
-    // } else {
-
-    // ObjectNode kestrelNode = (ObjectNode) rootNode.get("Kestrel");
-    // ObjectNode endpointsNode = (ObjectNode) kestrelNode.get("Endpoints");
-    // ObjectNode httpNode = (ObjectNode) endpointsNode.get("Http");
-    // httpNode.put("Url", "http://*:" + port);
-    // }
-
-    // String databaseName =
-    // examDatabaseRepository.findDatabaseNameByExamPaperId(examPaperId);
-    // if (rootNode.has("ConnectionStrings")) {
-    // ObjectNode connectionStringsNode = (ObjectNode)
-    // rootNode.get("ConnectionStrings");
-    // String dbServer = PathUtil.getDbServer();
-    // connectionStringsNode.fieldNames().forEachRemaining(key -> {
-    // connectionStringsNode.put(key, String.join(";",
-    // "Server=" + dbServer,
-    // "uid=" + PathUtil.DB_UID,
-    // "pwd=" + PathUtil.DB_PWD,
-    // "database=" + databaseName,
-    // "TrustServerCertificate=True"));
-    // });
-    // }
-
-    // content =
-    // objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rootNode);
-    // Files.writeString(filePath, content, StandardCharsets.UTF_8);
-    // }
 
     public void findAndUpdateAppsettings(Path dirPath, Long examPaperId, int port) {
         try (Stream<Path> folders = Files.walk(dirPath, 1)) {
@@ -924,8 +783,11 @@ private PathUtil PathUtil;
         }
 
         try {
+            // Convert byte[] to String with UTF-8
+            String fileCollectionString = new String(fileCollection, StandardCharsets.UTF_8);
+
             ObjectMapper objectMapper = new ObjectMapper();
-            ObjectNode rootNode = (ObjectNode) objectMapper.readTree(fileCollection);
+            ObjectNode rootNode = (ObjectNode) objectMapper.readTree(fileCollectionString);
             ArrayNode items = (ArrayNode) rootNode.get("item");
 
             for (int i = 0; i < items.size(); i++) {
@@ -1179,31 +1041,4 @@ private PathUtil PathUtil;
         Files.deleteIfExists(dirPath.resolve("docker-compose.yml"));
     }
 
-    // public static void deleteAllFilesAndFolders(String directoryPath) {
-    //     Path directory = Paths.get(directoryPath);
-
-    //     try {
-    //         Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-    //             @Override
-    //             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-
-    //                 Files.delete(file);
-    //                 System.out.println("Deleted file: " + file);
-    //                 return FileVisitResult.CONTINUE;
-    //             }
-
-    //             @Override
-    //             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-
-    //                 Files.delete(dir);
-    //                 System.out.println("Deleted directory: " + dir);
-    //                 return FileVisitResult.CONTINUE;
-    //             }
-    //         });
-
-    //         System.out.println("All files and folders deleted successfully.");
-    //     } catch (IOException e) {
-    //         System.err.println("Error while deleting files and folders: " + e.getMessage());
-    //     }
-    // }
 }
