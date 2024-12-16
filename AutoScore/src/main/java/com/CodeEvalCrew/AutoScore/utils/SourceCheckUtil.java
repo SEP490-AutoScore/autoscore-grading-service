@@ -110,11 +110,9 @@ public class SourceCheckUtil implements ISourceCheckUtil {
                         score.setGradedAt(LocalDateTime.now());
                         score.setReason(error);
                         scoreRepository.save(score);
-                        error = "";
                     } else {
                         score.setReason(error);
                         scoreRepository.save(score);
-                        error = "";
                     }
                 }
             }
