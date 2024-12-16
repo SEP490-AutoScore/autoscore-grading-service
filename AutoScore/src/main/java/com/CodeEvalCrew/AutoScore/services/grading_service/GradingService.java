@@ -49,6 +49,9 @@ public class GradingService implements IGradingService {
         boolean flag;
         do {
             GradingProcess gradingProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(request.getExamPaperId()).get();
+            // if (gradingProcess == null) {
+            //     throw new Exception("ExamPaper not found!");
+            // }
             try {
                 System.out.println("--------- Check Important ---------");
                 List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
