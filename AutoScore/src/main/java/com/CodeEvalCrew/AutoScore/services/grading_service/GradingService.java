@@ -12,6 +12,7 @@ import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Exam_Status_Enum;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.Notification_Type_Enum;
+import com.CodeEvalCrew.AutoScore.models.Entity.Exam;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.GradingProcess;
 import com.CodeEvalCrew.AutoScore.models.Entity.Notification;
@@ -64,32 +65,38 @@ public class GradingService implements IGradingService {
     public void gradingV2(CheckImportantRequest request) {
         boolean flag;
         do {
-            GradingProcess gradingProcess = gradingProcessRepository.findByExamPaper_ExamPaperId(request.getExamPaperId()).get();
+            GradingProcess gradingProcess = gradingProcessRepository
+                    .findByExamPaper_ExamPaperId(request.getExamPaperId()).get();
             // if (gradingProcess == null) {
-            //     throw new Exception("ExamPaper not found!");
+            // throw new Exception("ExamPaper not found!");
             // }
             Exam_Paper examPaper = examPaperRepository.findById(request.getExamPaperId()).get();
             try {
                 System.out.println("--------- Check Important ---------");
                 List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
                 System.out.println("--------- Grading ---------");
-               // Print out the number of StudentSourceInfoDTO
-            System.out.println("Number of StudentSourceInfoDTOs before grading: " + listSourceInfoDTOs.size());
-                List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
+                // Print out the number of StudentSourceInfoDTO
+                System.out.println("Number of StudentSourceInfoDTOs before grading: " + listSourceInfoDTOs.size());
+                List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService
+                        .gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
                 System.out.println("--------- Plagiarism Detection ---------");
-                plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
+                plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO,
+                        request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
                 System.out.println("--------- Add Student Error To Score ---------");
                 scoreService.addStudentErrorToScore(request.getExamPaperId());
                 System.out.println("--------- Done ---------");
-                //set grading process
+                // set grading process
                 gradingProcess.setStatus(GradingStatusEnum.DONE);
                 gradingProcessRepository.save(gradingProcess);
-                sseController.pushGradingProcess(gradingProcess.getProcessId(), GradingStatusEnum.DONE, LocalDateTime.now(), gradingProcess.getExamPaper().getExamPaperId());
-                //set exam paper status
+                sseController.pushGradingProcess(gradingProcess.getProcessId(), GradingStatusEnum.DONE,
+                        LocalDateTime.now(), gradingProcess.getExamPaper().getExamPaperId());
+                // set exam paper status
                 examPaper.setStatus(Exam_Status_Enum.COMPLETE);
                 examPaperRepository.save(examPaper);
-                //Noti
-                Notification noti = new Notification(null, "Grading", "Grading exam paper "+ examPaper.getExamPaperCode() +" Done!", "/exams", Notification_Type_Enum.SUCCESS, null);
+                // Noti
+                Notification noti = new Notification(null, "Grading",
+                        "Grading exam paper " + examPaper.getExamPaperCode() + " Done!", "/exams",
+                        Notification_Type_Enum.SUCCESS, null);
                 noti = notiRepo.save(noti);
                 sendNotificationUtil.sendNotification(noti, gradingProcess.getCreateBy());
 
@@ -97,15 +104,18 @@ public class GradingService implements IGradingService {
                 System.out.println(e.getCause());
                 gradingProcess.setStatus(GradingStatusEnum.ERROR);
                 gradingProcessRepository.save(gradingProcess);
-                sseController.pushGradingProcess(gradingProcess.getProcessId(), GradingStatusEnum.ERROR, LocalDateTime.now(), gradingProcess.getExamPaper().getExamPaperId());
-                //set exam paper status
+                sseController.pushGradingProcess(gradingProcess.getProcessId(), GradingStatusEnum.ERROR,
+                        LocalDateTime.now(), gradingProcess.getExamPaper().getExamPaperId());
+                // set exam paper status
                 examPaper.setStatus(Exam_Status_Enum.COMPLETE);
                 examPaperRepository.save(examPaper);
-                //Noti
-                Notification noti = new Notification(null, "Grading", "Grading exam paper "+ examPaper.getExamPaperCode() +" Error!", "/exams", Notification_Type_Enum.ERROR, null);
+                // Noti
+                Notification noti = new Notification(null, "Grading",
+                        "Grading exam paper " + examPaper.getExamPaperCode() + " Error!", "/exams",
+                        Notification_Type_Enum.ERROR, null);
                 noti = notiRepo.save(noti);
                 sendNotificationUtil.sendNotification(noti, gradingProcess.getCreateBy());
-                
+
             }
             gradingProcess = gradingProcessRepository.findFirstByStatus(GradingStatusEnum.PENDING);
             if (gradingProcess != null) {
@@ -126,15 +136,18 @@ public class GradingService implements IGradingService {
             System.out.println("--------- Check Important ---------");
             List<StudentSourceInfoDTO> listSourceInfoDTOs = checkimportant.checkImportantForGranding(request);
             System.out.println("--------- Grading ---------");
-            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService.gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
+            List<StudentSourceInfoDTO> listStudentSourceInfoHaveScoreDTO = autoscorePostmanService
+                    .gradingFunction(listSourceInfoDTOs, request.getExamPaperId());
             System.out.println("--------- Plagiarism Detection ---------");
-            plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(), request.getOrganizationId(), request.getExamPaperId());
+            plagiarismDetectionService.runPlagiarismDetection(listStudentSourceInfoHaveScoreDTO, request.getExamType(),
+                    request.getOrganizationId(), request.getExamPaperId());
             System.out.println("--------- Add Student Error To Score ---------");
             scoreService.addStudentErrorToScore(request.getExamPaperId());
             System.out.println("--------- Done ---------");
         } catch (Exception | NotFoundException e) {
-            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(), request.getExamPaperId());
+            sseController.pushGradingProcess(0l, GradingStatusEnum.ERROR, LocalDateTime.now(),
+                    request.getExamPaperId());
         }
     }
-
+   
 }

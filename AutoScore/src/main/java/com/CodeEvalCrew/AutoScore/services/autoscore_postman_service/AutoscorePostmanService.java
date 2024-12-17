@@ -42,9 +42,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.CodeEvalCrew.AutoScore.controllers.SSEController;
+import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.ResponseDTO.StudentDeployResult;
 import com.CodeEvalCrew.AutoScore.models.DTO.StudentSourceInfoDTO;
 import com.CodeEvalCrew.AutoScore.models.Entity.Enum.GradingStatusEnum;
+import com.CodeEvalCrew.AutoScore.models.Entity.Exam;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Database;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Paper;
 import com.CodeEvalCrew.AutoScore.models.Entity.Exam_Question;
@@ -55,6 +57,7 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Score_Detail;
 import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
 import com.CodeEvalCrew.AutoScore.models.Entity.Student;
 import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamPaperRepository;
+import com.CodeEvalCrew.AutoScore.repositories.exam_repository.IExamRepository;
 import com.CodeEvalCrew.AutoScore.repositories.examdatabase_repository.IExamDatabaseRepository;
 import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.postman_for_grading.PostmanForGradingRepository;
@@ -112,6 +115,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
     private IExamDatabaseRepository examDatabaseRepository;
     @Autowired
     private IExamPaperRepository examPaperRepository;
+    @Autowired
+    private IExamRepository examRepository;
     @Autowired
     private ScoreRepository scoreRepository;
     @Autowired
@@ -189,6 +194,8 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         deleteAndCreateDatabaseByExamPaperId(examPaperId);
 
         processStudentSolutions(studentSources, examPaperId, numberDeploy);
+
+        updateGradingAt(examPaperId);
 
         List<StudentSourceInfoDTO> studentsWithScores = studentSources.stream()
                 .filter(student -> {
@@ -1041,4 +1048,17 @@ public class AutoscorePostmanService implements IAutoscorePostmanService {
         Files.deleteIfExists(dirPath.resolve("docker-compose.yml"));
     }
 
+    public void updateGradingAt(Long examPaperId) {
+        try {
+            Exam_Paper examPaper = examPaperRepository.findById(examPaperId)
+                    .orElseThrow(() -> new NotFoundException("Exam Paper not found with ID: " + examPaperId));
+            Exam exam = examPaper.getExam();
+            if (exam == null) {
+                throw new NotFoundException("Exam not found for Exam Paper ID: " + examPaperId);
+            }
+            exam.setGradingAt(LocalDateTime.now());
+            examRepository.save(exam);
+        } catch (NotFoundException e) {
+        }
+    }
 }
