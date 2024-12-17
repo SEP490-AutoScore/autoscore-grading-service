@@ -203,6 +203,7 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
         }
     }
 
+    @Transactional
     private void runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
         String normalizedCode = codeNormalizer.normalizeCode(studentDetail.getStudentSourceCodePath());
         List<String> nGrams = nGramGenerator.generateNGrams(normalizedCode, 5);
