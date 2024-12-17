@@ -8,5 +8,4 @@ public interface IGradingService {
 
     void grading(CheckImportantRequest request) throws Exception, NotFoundException;
 
-    void updateGradingAt(Long examPaperId);
 }
