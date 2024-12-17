@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,9 @@ public class NGram {
 
     @Lob
     private String nGramValue;
+
+    @Version
+    private Long version;
 
     @ManyToOne
     @JoinColumn(name = "sourceDetailId")
