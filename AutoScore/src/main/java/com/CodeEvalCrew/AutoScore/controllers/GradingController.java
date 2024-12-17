@@ -11,7 +11,6 @@ import com.CodeEvalCrew.AutoScore.exceptions.NotFoundException;
 import com.CodeEvalCrew.AutoScore.models.DTO.RequestDTO.CheckImportantRequest;
 import com.CodeEvalCrew.AutoScore.services.grading_service.IGradingService;
 
-
 @RestController
 @RequestMapping("/api/grading")
 public class GradingController {
@@ -26,23 +25,24 @@ public class GradingController {
     @PostMapping("")
     public ResponseEntity<?> grading(@RequestBody CheckImportantRequest request) {
         try {
-
             gradingService.grading(request);
-
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (NotFoundException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (Exception e) {
-            return new ResponseEntity<>(e.getCause(),HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(e.getCause(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     @PostMapping("/v2")
     public ResponseEntity<?> gradingV2(@RequestBody CheckImportantRequest request) {
+        try {
+            gradingService.gradingV2(request);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getCause(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
-        gradingService.gradingV2(request);
-
-        return new ResponseEntity<>(HttpStatus.OK);
     }
 
 }

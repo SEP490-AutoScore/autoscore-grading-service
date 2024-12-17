@@ -13,8 +13,10 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -22,6 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import org.hibernate.StaleObjectStateException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import com.CodeEvalCrew.AutoScore.controllers.SSEController;
@@ -34,8 +39,15 @@ import com.CodeEvalCrew.AutoScore.models.Entity.Source_Detail;
 import com.CodeEvalCrew.AutoScore.repositories.grading_process_repository.GradingProcessRepository;
 import com.CodeEvalCrew.AutoScore.repositories.source_repository.SourceDetailRepository;
 
+import jakarta.annotation.PreDestroy;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
+
 @Service
 public class PlagiarismDetectionService implements IPlagiarismDetectionService {
+
+    @Autowired
+    private EntityManager entityManager;
 
     private final SourceDetailRepository sourceDetailRepository;
     private final CodeNormalizer codeNormalizer;
@@ -46,7 +58,8 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
     private final Set<String> fingerprintDatabase = new HashSet<>();
     private static final int THRESHOLD_LOW = 50;
     private static final int THRESHOLD_HIGH = 70;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(1);
+    ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+    CompletionService<Void> completionService = new ExecutorCompletionService<>(executorService);
     private final GradingProcessRepository gradingProcessRepository;
     private final SSEController sseController;
 
@@ -91,12 +104,19 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             // Normalizing and generating N-grams
             System.out.println("Normalizing and generating N-grams for all students.");
             List<Future<?>> futures = new ArrayList<>();
-            for (Source_Detail studentDetail : studentDetails) {
+            for (Source_Detail studentDetail : new ArrayList<>(studentDetails)) {
                 fingerprintDatabase.clear();
-                Future<?> future = executorService.submit(() -> {
-                    runNormalizationAndNGramsComparison(studentDetail, dbSourceDetails);
-                    // Lưu lại studentDetail sau khi cập nhật normalizedCode và NGrams
-                    sourceDetailRepository.save(studentDetail);
+                Future<?> future = completionService.submit(() -> {
+                    try {
+                        runNormalizationAndNGramsComparison(studentDetail, dbSourceDetails);
+                        synchronized (studentDetail) {
+                            retrySaveSourceDetail(studentDetail);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error during normalization and N-grams: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                    return null;
                 });
                 futures.add(future);
             }
@@ -105,8 +125,16 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             // Fingerprinting and LSH
             System.out.println("Running fingerprinting and LSH for all students.");
             List<Future<?>> futuresFingerprint = new ArrayList<>();
-            for (Source_Detail studentDetail : studentDetails) {
-                Future<?> futureFingerprint = executorService.submit(() -> runFingerprintingAndLSH(studentDetail, dbSourceDetails));
+            for (Source_Detail studentDetail : new ArrayList<>(studentDetails)) {
+                Future<?> futureFingerprint = completionService.submit(() -> {
+                    try {
+                        runFingerprintingAndLSH(studentDetail, dbSourceDetails);
+                    } catch (Exception e) {
+                        System.err.println("Error during fingerprinting and LSH: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                    return null;
+                });
                 futuresFingerprint.add(futureFingerprint);
             }
             waitForFutures(futuresFingerprint, "Fingerprinting and LSH");
@@ -115,14 +143,48 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             System.out.println("Running final check plagiarism for all students.");
             finalCheckPlagiarismService.finalCheckPlagiarism(examPaperId);
 
-            executorService.shutdown();
             gp.setStatus(GradingStatusEnum.DONE);
             sseController.pushGradingProcess(gp.getProcessId(), gp.getStatus(), gp.getStartDate(), examPaperId);
             gradingProcessRepository.save(gp);
-            System.gc();
+
             System.out.println("Plagiarism detection completed for all students.");
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Plagiarism detection interrupted: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    @PreDestroy
+    public void shutdownExecutor() {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Transactional
+    private void retrySaveSourceDetail(Source_Detail studentDetail) {
+        int retries = 3;
+        while (retries > 0) {
+            try {
+                sourceDetailRepository.save(studentDetail);
+                return;
+            } catch (OptimisticLockingFailureException | StaleObjectStateException e) {
+                retries--;
+                if (retries > 0) {
+                    System.err.println("Retrying save after refreshing due to stale data: " + e.getMessage());
+                    // Làm mới từ database
+                    entityManager.refresh(studentDetail);
+                } else {
+                    throw e;
+                }
+            }
         }
     }
 
@@ -141,6 +203,7 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
         }
     }
 
+    @Transactional
     private void runNormalizationAndNGramsComparison(Source_Detail studentDetail, List<Source_Detail> dbSourceDetails) {
         String normalizedCode = codeNormalizer.normalizeCode(studentDetail.getStudentSourceCodePath());
         List<String> nGrams = nGramGenerator.generateNGrams(normalizedCode, 5);
@@ -175,14 +238,13 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
             if (overlapPercentage >= THRESHOLD_LOW) {
                 isSuspicious = overlapPercentage >= THRESHOLD_HIGH ? "DEFINITELY" : "POSSIBLY";
                 List<String> plagiarizedSegments = new CopyOnWriteArrayList<>(studentNGramsSet);
-                if (plagiarizedSegments.isEmpty()) {
-                    System.out.println("No plagiarized segments found.");
+                if (!plagiarizedSegments.isEmpty()) {
+                    CodePlagiarismResult plagiarizedCodeResult = extractFullPlagiarizedCode(
+                            normalizedCode, plagiarizedSegments, studentDetail, dbDetail);
+                    plagiarizedCodeResult.setPlagiarismPercentage(overlapPercentage);
+                    plagiarizedCodeResult.setType("SHORT CODE");
+                    codePlagiarismResults.add(plagiarizedCodeResult);
                 }
-                CodePlagiarismResult plagiarizedCodeResult = extractFullPlagiarizedCode(
-                        normalizedCode, plagiarizedSegments, studentDetail, dbDetail);
-                plagiarizedCodeResult.setPlagiarismPercentage(overlapPercentage);
-                plagiarizedCodeResult.setType("SHORT CODE");
-                codePlagiarismResults.add(plagiarizedCodeResult);
             }
         }
 
@@ -211,8 +273,7 @@ public class PlagiarismDetectionService implements IPlagiarismDetectionService {
                 CodePlagiarismResult plagiarizedCodeResult = extractFullPlagiarizedCode(
                         normalizedCode, checkResult.getMatchingSegments(), studentDetail, dbDetail);
 
-                if (plagiarizedCodeResult.getSelfCode() != null && !plagiarizedCodeResult.getSelfCode().isEmpty()
-                        && plagiarizedCodeResult.getStudentPlagiarism() != null && !plagiarizedCodeResult.getStudentPlagiarism().isEmpty()) {
+                if (!plagiarizedCodeResult.getSelfCode().isEmpty() && !plagiarizedCodeResult.getStudentPlagiarism().isEmpty()) {
                     plagiarizedCodeResult.setPlagiarismPercentage(checkResult.getMatchPercentage());
                     plagiarizedCodeResult.setType("LONG CODE");
                     codePlagiarismResults.add(plagiarizedCodeResult);
