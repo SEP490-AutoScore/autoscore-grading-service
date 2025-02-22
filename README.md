@@ -45,14 +45,15 @@ AutoScore is an AI-powered tool designed for automatic grading of subjects using
 
 ## 🔥 Key Features
 
-- 🔐 Authentication & Authorization  
-- 👤 Account Management  
-- 🎭 Role & Permission Management  
-- 🏢 Organization & Position Management  
-- 📄 Exam & Exam Paper Management  
-- 📥 Import Source Code & Student Data  
-- 📚 Subject & Semester Management  
-- 📊 Score Management & Grading Process  
+-  Check Important
+-  Grading
+-  Check Plagiarism
+-  Queue Management
+
+---
+
+## Flow
+![Flow](Images/Flow.png)
 
 ---
 
